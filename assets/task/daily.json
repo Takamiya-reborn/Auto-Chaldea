@@ -1,0 +1,36 @@
+{
+    "task_name": "日常战斗循环",
+    "steps": [
+        {
+            "template": "skill_2.png",
+            "index": 0,
+            "wait_after": 5,
+            "region": ""
+        },
+        {
+            "template": "skill_3.png",
+            "index": 1,
+            "wait_after": 3,
+            "region": ""
+        },
+        {
+            "template": "Olgamarie_1.png",
+            "index": 0,
+            "wait_after": 5,
+            "region": ""
+        },
+        {
+            "template": "attack.png",
+            "index": 0,
+            "wait_after": 5,
+            "region": ""
+        },
+        {
+            "template": "Planet_Olgamarie.png",
+            "index": 0,
+            "wait_after": 30,
+            "region": ""
+        },
+        {}
+    ]
+}
