@@ -32,8 +32,8 @@ def connect_to_device(port, adb_path=ADB_PATH):
             check=False,
             timeout=15,
         )
-    except FileNotFoundError:
-        print(f"ADB executable not found: {adb_path}")
+    except OSError as error:
+        print(f"Failed to run ADB executable {adb_path}: {error}")
         return False
     except subprocess.TimeoutExpired:
         print(f"ADB connection timed out: {address}")
@@ -42,9 +42,38 @@ def connect_to_device(port, adb_path=ADB_PATH):
     output = (result.stdout or result.stderr).strip()
     if output:
         print(output)
-    if result.returncode == 0:
-        print(f"ADB connection succeeded: {address}")
-        return True
 
-    print(f"ADB connection failed: {address}")
+    # adb connect 在连接失败时也可能返回退出码 0（例如端口上没有进程监听），
+    # 因此必须根据输出内容判断是否真正建立了连接。
+    if result.returncode != 0 or "connected to" not in output.lower():
+        print(f"ADB connection failed: {address}")
+        return False
+
+    if not _device_is_online(address, adb_path):
+        print(f"ADB connection failed: {address} (device offline)")
+        return False
+
+    print(f"ADB connection succeeded: {address}")
+    return True
+
+
+def _device_is_online(address, adb_path=ADB_PATH):
+    """Check that the device appears in ``adb devices`` with online state."""
+    try:
+        result = subprocess.run(
+            [str(adb_path), "devices"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+            timeout=15,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False
+
+    for line in (result.stdout or "").splitlines():
+        parts = line.split()
+        if len(parts) >= 2 and parts[0] == address:
+            return parts[1] == "device"
     return False

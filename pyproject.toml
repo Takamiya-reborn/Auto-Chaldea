@@ -9,7 +9,12 @@ authors = [
 requires-python = ">=3.13"
 dependencies = [
     "opencv-contrib-python>=5.0.0.93",
+    "pyside6>=6.11.2",
 ]
+
+[[tool.uv.index]]
+url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+default = true
 
 [project.scripts]
 auto-chaldea = "auto_chaldea:main"
