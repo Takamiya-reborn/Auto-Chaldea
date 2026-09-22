@@ -13,7 +13,9 @@
 - 使用 OpenCV 模板匹配查找单个或多个 UI 元素
 - 使用 ADB 执行坐标点击
 - 使用 `assets/task`、`assets/template` 分离任务配置和图像模板
-- 依赖 PySide6，为后续桌面控制面板预留基础
+- 使用 PySide6 提供设备连接、任务浏览和执行控制界面
+- 从 JSON 加载任务并按模板识别结果顺序执行点击步骤
+- 支持任务执行过程中的暂停、继续、停止和状态反馈
 
 目前还没有完整的 Fate/GO 任务流程。README 中标记为“计划”的内容不代表已经实现。
 
@@ -55,10 +57,10 @@ flowchart TB
 		adb[ADB 层\nconnector.py\n连接、设备状态、截图、输入]
 		perception[感知层\nrecognizer.py\nOpenCV 模板匹配、ROI、置信度]
 		action[动作层\nadb_click.py\n点击、滑动、输入]
-		workflow[状态机 / 任务执行器\n计划：workflow/\n状态迁移、重试、超时、异常恢复]
+		workflow[任务执行器\n执行步骤、暂停、停止、状态反馈]
 		config[(任务配置\nassets/task/*.json)]
 		templates[(图像模板\nassets/template/)]
-		ui[桌面控制面板\n计划：ui/\nPySide6 控制、预览、日志、停止]
+		ui[桌面控制面板\nui/\nPySide6 控制、任务详情、日志、停止]
 		logs[(截图与运行日志)]
 		human{人工确认 /\n安全停止}
 
@@ -80,7 +82,8 @@ flowchart TB
 		classDef implemented fill:#1f3a2a,stroke:#3fb950,color:#aff5b4;
 		classDef planned fill:#3b2d1a,stroke:#d29922,color:#ffdf9e,stroke-dasharray: 5 5;
 		class adb,perception,action,device,templates implemented;
-		class workflow,config,logs,ui,human planned;
+		class workflow,config,ui implemented;
+		class logs,human planned;
 		linkStyle default stroke:#8b949e,stroke-width:2.5px;
 ```
 
@@ -94,8 +97,9 @@ flowchart TB
 - `core/paths.py`：集中管理资源目录和可执行文件路径
 - `task/`：保存任务配置和状态定义
 - `template/`：保存经过命名和版本管理的模板图片
-- 后续新增 `workflow/`：实现状态机、重试和异常恢复
-- 后续新增 `ui/`：实现 PySide6 控制界面
+- `core/task_repository.py`：加载和筛选 JSON 任务步骤
+- `core/task_executor.py`：执行模板识别和点击步骤
+- `ui/`：提供设备连接、任务浏览、执行控制和运行状态界面
 
 ## 目录规划
 
@@ -105,11 +109,13 @@ src/auto_chaldea/
     connector.py       # ADB 连接
     adb_click.py       # 点击和输入动作
     recognizer.py      # 截图与 OpenCV 识别
-    paths.py           # 路径管理
+		paths.py            # 路径管理
 		task_repository.py  # 任务配置读取与步骤筛选
 		task_executor.py    # 任务步骤执行
-  workflow/             # 计划：状态机和任务执行器
 	ui/                   # PySide6 界面
+		connect_dialog.py   # 启动时的设备连接
+		main_window.py      # 主窗口和面板切换
+		task_detail.py      # 任务详情和执行控制
 		task_table.py       # 任务步骤表格
 assets/
   platform-tools/      # ADB 运行时文件
@@ -127,7 +133,7 @@ tests/                  # 计划：单元测试和识别回归样本
 - [x] 接入 OpenCV、NumPy 和 PySide6 依赖
 - [x] 封装 ADB 连接、截图、模板匹配和点击
 - [ ] 增加统一日志和异常类型
-- [ ] 增加设备探测、连接状态和超时检查
+- [x] 增加设备探测、连接状态和超时检查
 
 ### M1：识别实验台
 
@@ -138,9 +144,10 @@ tests/                  # 计划：单元测试和识别回归样本
 
 ### M2：任务执行器
 
-- [ ] 定义状态、条件、动作、超时和重试模型
-- [ ] 支持点击、滑动、等待、截图和人工确认动作
-- [ ] 实现安全停止、失败回退和最大重试次数
+- [x] 支持基于 JSON 的模板识别和点击步骤
+- [x] 支持步骤等待、暂停、继续和安全停止
+- [ ] 定义状态、条件、动作、重试和异常恢复模型
+- [ ] 支持滑动、截图和人工确认动作
 - [ ] 用虚拟截图测试任务状态迁移
 
 ### M3：首个可用流程
@@ -152,8 +159,8 @@ tests/                  # 计划：单元测试和识别回归样本
 
 ### M4：桌面界面与维护
 
-- [ ] 设备和任务选择
-- [ ] 实时日志、截图和状态展示
+- [x] 设备和任务选择
+- [x] 实时日志和任务状态展示
 - [ ] 模板调试与阈值配置
 - [ ] 配置版本化、回归测试和发布说明
 
