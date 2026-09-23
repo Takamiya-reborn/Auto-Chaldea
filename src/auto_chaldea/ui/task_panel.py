@@ -1,16 +1,19 @@
 """侧栏中的任务列表面板，加载 assets/task 下的 JSON 任务。"""
 
-from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtCore import QUrl, QSize, Qt, Signal
+from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QListWidget,
     QListWidgetItem,
+    QMenu,
     QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
+from auto_chaldea.core.paths import TASK_DIR
 from auto_chaldea.core.task_repository import load_task_files, valid_steps
 from auto_chaldea.ui.icons import refresh_icon
 from auto_chaldea.ui.theme import GITHUB_DARK
@@ -47,6 +50,8 @@ class TaskPanel(QWidget):
 
         self._list = QListWidget(self)
         self._list.setSpacing(2)
+        self._list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self._list.customContextMenuRequested.connect(self._show_context_menu)
         self._list.itemSelectionChanged.connect(self._emit_selection)
         layout.addWidget(self._list, 1)
 
@@ -76,3 +81,9 @@ class TaskPanel(QWidget):
             return
         task, filename = current.data(Qt.UserRole)
         self.task_selected.emit(task, filename)
+
+    def _show_context_menu(self, pos):
+        menu = QMenu(self._list)
+        open_dir_action = menu.addAction("打开任务目录")
+        if menu.exec(self._list.mapToGlobal(pos)) is open_dir_action:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(TASK_DIR)))

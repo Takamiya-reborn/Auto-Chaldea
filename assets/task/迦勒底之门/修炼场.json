@@ -30,7 +30,6 @@
             "index": 0,
             "wait_after": 30,
             "region": ""
-        },
-        {}
+        }
     ]
 }

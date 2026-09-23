@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 
 from auto_chaldea.ui.icons import pause_icon, play_icon, stop_icon, tasks_pixmap
 from auto_chaldea.ui.theme import GITHUB_DARK
+from auto_chaldea.core.connector import disconnect_device
 from auto_chaldea.core.task_repository import valid_steps
 from auto_chaldea.ui.task_table import TaskStepTable
 from auto_chaldea.ui.worker import TaskWorker
@@ -161,10 +162,17 @@ class TaskDetailView(QWidget):
         self._stack.setCurrentIndex(1)
 
     def shutdown(self):
-        """窗口关闭前停止后台任务。"""
+        """窗口关闭前停止后台任务并断开 ADB 连接。"""
         if self._worker is not None:
             self._worker.stop()
             self._worker.wait()
+
+        port = self._port_edit.text().strip()
+        if port:
+            try:
+                disconnect_device(int(port))
+            except ValueError:
+                pass
 
     def set_device_port(self, port):
         """记录启动时已连接的设备端口并更新状态提示。"""
@@ -232,9 +240,7 @@ class TaskDetailView(QWidget):
     def _on_step_started(self, position):
         total = self._table.rowCount()
         self._table.selectRow(position)
-        self._set_status(
-            f"运行中 · 步骤 {position + 1}/{total}", GITHUB_DARK["accent"]
-        )
+        self._set_status(f"运行中 · 步骤 {position + 1}/{total}", GITHUB_DARK["accent"])
 
     def _on_step_finished(self, position, clicked):
         if clicked:

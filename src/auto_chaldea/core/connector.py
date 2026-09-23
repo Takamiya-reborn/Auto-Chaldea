@@ -57,6 +57,54 @@ def connect_to_device(port, adb_path=ADB_PATH):
     return True
 
 
+def disconnect_device(port, adb_path=ADB_PATH):
+    """Disconnect a previously connected Android device.
+
+    Args:
+        port: Device port number in the range 1 to 65535.
+        adb_path: Path to the ADB executable.
+
+    Returns:
+        True if the disconnection succeeds; otherwise False.
+    """
+    try:
+        port = int(port)
+    except (TypeError, ValueError) as error:
+        raise ValueError("Port must be an integer between 1 and 65535.") from error
+
+    if not 1 <= port <= 65535:
+        raise ValueError("Port must be an integer between 1 and 65535.")
+
+    address = f"127.0.0.1:{port}"
+    try:
+        result = subprocess.run(
+            [str(adb_path), "disconnect", address],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+            timeout=15,
+        )
+    except OSError as error:
+        print(f"Failed to run ADB executable {adb_path}: {error}")
+        return False
+    except subprocess.TimeoutExpired:
+        print(f"ADB disconnection timed out: {address}")
+        return False
+
+    output = (result.stdout or result.stderr).strip()
+    if output:
+        print(output)
+
+    if result.returncode != 0:
+        print(f"ADB disconnection failed: {address}")
+        return False
+
+    print(f"ADB disconnected: {address}")
+    return True
+
+
 def _device_is_online(address, adb_path=ADB_PATH):
     """Check that the device appears in ``adb devices`` with online state."""
     try:
