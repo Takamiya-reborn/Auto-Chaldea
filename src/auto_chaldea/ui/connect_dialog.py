@@ -1,6 +1,6 @@
 """启动时的设备连接对话框：输入模拟器端口，连接成功后进入主界面。"""
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QIntValidator
 from PySide6.QtWidgets import (
     QApplication,
@@ -9,12 +9,13 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QToolButton,
     QVBoxLayout,
 )
 
-from auto_chaldea.core.connector import connect_to_device
-from auto_chaldea.core.paths import ADB_PATH
-from auto_chaldea.ui.icons import device_pixmap
+from auto_chaldea.utils.connector import connect_to_device
+from auto_chaldea.utils.paths import ADB_PATH
+from auto_chaldea.ui.icons import device_icon
 from auto_chaldea.ui.theme import GITHUB_DARK
 
 
@@ -34,10 +35,15 @@ class ConnectDialog(QDialog):
         layout.setContentsMargins(28, 28, 28, 24)
         layout.setSpacing(10)
 
-        icon_label = QLabel(self)
-        icon_label.setPixmap(device_pixmap(GITHUB_DARK["accent"], 44))
-        icon_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(icon_label)
+        icon_button = QToolButton(self)
+        icon_button.setIcon(device_icon(GITHUB_DARK["accent"]))
+        icon_button.setIconSize(QSize(44, 44))
+        icon_button.setFixedSize(56, 56)
+        icon_button.setEnabled(False)
+        icon_button.setStyleSheet(
+            "QToolButton { background: transparent; border: none; }"
+        )
+        layout.addWidget(icon_button, alignment=Qt.AlignCenter)
 
         title = QLabel("Auto-Chaldea", self)
         title.setObjectName("detailTitle")
@@ -93,7 +99,9 @@ class ConnectDialog(QDialog):
         except ValueError:
             port = 0
         if not 1 <= port <= 65535:
-            self._set_status("端口必须是 1 到 65535 之间的整数", GITHUB_DARK["attention"])
+            self._set_status(
+                "端口必须是 1 到 65535 之间的整数", GITHUB_DARK["attention"]
+            )
             return
 
         self._connect_button.setEnabled(False)
@@ -103,7 +111,9 @@ class ConnectDialog(QDialog):
 
         try:
             ok = connect_to_device(port, adb_path=ADB_PATH)
-        except Exception as error:  # noqa: BLE001 - 连接出错不允许卡死对话框，必须可以重试
+        except (
+            Exception
+        ) as error:  # noqa: BLE001 - 连接出错不允许卡死对话框，必须可以重试
             message = f"连接出错：{error}"
             self._set_status(message, GITHUB_DARK["danger"])
             self._port_edit.setFocus()

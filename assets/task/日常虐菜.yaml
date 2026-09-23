@@ -1,0 +1,56 @@
+task_name: 日常虐菜
+steps:
+  # Turn 1
+  - template: 技能池/skill_2
+  - template: Center
+  - template: 技能池/skill_3
+    index: 1
+  - template: Center
+    wait_after: 3
+  - template: 角色池/奥尔加玛丽/1
+    wait_after: 5
+  - template: 基本/attack
+    wait_after: 5
+  - template: 宝具/既已过去的人理之终
+    wait_after: 2
+  - template: 基本/buster,基本/arts,基本/quick
+    mode: multi
+    count: 2
+    wait_after: 30
+  # Turn 2
+  - template: 技能池/skill_1
+  - template: Center
+  - template: 技能池/skill_5
+  - template: Center
+  - template: 技能池/skill_2
+    index: 0
+  - template: Center
+  - template: 技能池/skill_2
+  - template: Center
+  - template: 角色池/奥尔加玛丽/1
+  - template: 技能池/skill_4
+  - template: Center
+  - template: 角色池/奥尔加玛丽/1
+  - template: 基本/御主技能
+  - template: 技能池/skill_1
+  - template: Center
+  - template: 角色池/奥尔加玛丽/1
+  - template: 技能池/skill_2
+  - template: Center
+  - template: 技能池/skill_3
+  - template: Center
+  - template: 基本/attack
+  - template: 基本/buster
+  - template: 基本/quick
+  - template: 基本/arts
+    wait_after: 20
+  # Turn 3
+  - template: 技能池/skill_1
+  - template: Center
+  - template: 基本/attack
+  - template: 宝具/既已过去的人理之终
+  - template: 基本/buster
+    mode: multi
+    count: 2
+    wait_after: 20
+  # End Phase

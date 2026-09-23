@@ -1,5 +1,5 @@
-from auto_chaldea.core.connector import connect_to_device
-from auto_chaldea.core.paths import (
+from auto_chaldea.utils.connector import connect_to_device
+from auto_chaldea.utils.paths import (
     ADB_PATH,
     ASSETS_DIR,
     REPO_ROOT,

@@ -1,9 +1,10 @@
 """Task configuration loading and validation helpers."""
 
-import json
 from pathlib import Path
 
-from auto_chaldea.core.paths import TASK_DIR
+import yaml
+
+from auto_chaldea.utils.paths import TASK_DIR
 
 
 def normalize_region(region):
@@ -36,7 +37,7 @@ def load_tasks(task_dir=None):
 
 
 def load_task_files(task_dir=None):
-    """Load task dictionaries together with their source file stems."""
+    """Load task dictionaries together with their source paths relative to the task dir."""
     base_dir = Path(task_dir) if task_dir is not None else TASK_DIR
     if not base_dir.exists():
         return []
@@ -45,14 +46,15 @@ def load_task_files(task_dir=None):
 
 
 def _iter_task_files(base_dir):
-    for json_path in sorted(base_dir.glob("*.json")):
+    yaml_files = sorted([*base_dir.rglob("*.yaml"), *base_dir.rglob("*.yml")])
+    for yaml_path in yaml_files:
         try:
-            with json_path.open("r", encoding="utf-8") as file:
-                task = json.load(file)
-        except (OSError, json.JSONDecodeError):
+            with yaml_path.open("r", encoding="utf-8") as file:
+                task = yaml.safe_load(file)
+        except (OSError, yaml.YAMLError):
             continue
         if isinstance(task, dict):
-            yield json_path.stem, task
+            yield yaml_path.relative_to(base_dir).with_suffix("").as_posix(), task
 
 
 def valid_steps(task):

@@ -1,6 +1,6 @@
 import subprocess
 
-from auto_chaldea.core.paths import ADB_PATH
+from auto_chaldea.utils.paths import ADB_PATH
 
 
 def connect_to_device(port, adb_path=ADB_PATH):
@@ -43,8 +43,6 @@ def connect_to_device(port, adb_path=ADB_PATH):
     if output:
         print(output)
 
-    # adb connect 在连接失败时也可能返回退出码 0（例如端口上没有进程监听），
-    # 因此必须根据输出内容判断是否真正建立了连接。
     if result.returncode != 0 or "connected to" not in output.lower():
         print(f"ADB connection failed: {address}")
         return False
@@ -58,15 +56,7 @@ def connect_to_device(port, adb_path=ADB_PATH):
 
 
 def disconnect_device(port, adb_path=ADB_PATH):
-    """Disconnect a previously connected Android device.
-
-    Args:
-        port: Device port number in the range 1 to 65535.
-        adb_path: Path to the ADB executable.
-
-    Returns:
-        True if the disconnection succeeds; otherwise False.
-    """
+    """Disconnect a previously connected Android device."""
     try:
         port = int(port)
     except (TypeError, ValueError) as error:

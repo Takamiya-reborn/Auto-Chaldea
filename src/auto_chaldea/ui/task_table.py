@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
 
 from auto_chaldea.ui.theme import GITHUB_DARK
 
-HEADERS = ("#", "模板", "匹配序号", "区域", "点击后等待", "结果")
+HEADERS = ("#", "模板", "匹配序号", "区域", "点击后等待", "模式", "结果")
 
 
 class TaskStepTable(QTableWidget):
@@ -28,14 +28,17 @@ class TaskStepTable(QTableWidget):
     def set_steps(self, steps):
         self.setRowCount(len(steps))
         for row, step in enumerate(steps):
-            wait_after = step.get("wait_after", 0)
+            wait_value = step.get("wait_after")
+            wait_after = 1 if wait_value in (None, "") else wait_value
             region = step.get("region") or "全屏"
+            mode = step.get("mode") or "Single"
             values = (
                 str(row + 1),
                 str(step.get("template", "")),
                 str(step.get("index", 0)),
                 str(region),
-                f"{wait_after} 秒" if wait_after else "—",
+                f"{wait_after} 秒",
+                str(mode),
                 "—",
             )
             for column, value in enumerate(values):

@@ -5,8 +5,8 @@ import time
 
 from PySide6.QtCore import QThread, Signal
 
-from auto_chaldea.core.connector import connect_to_device
-from auto_chaldea.core.paths import ADB_PATH, TEMPLATE_DIR
+from auto_chaldea.utils.connector import connect_to_device
+from auto_chaldea.utils.paths import ADB_PATH, TEMPLATE_DIR
 from auto_chaldea.core.task_executor import execute_step
 from auto_chaldea.core.task_repository import valid_steps
 
@@ -98,6 +98,7 @@ class TaskWorker(QThread):
                     adb_path=ADB_PATH,
                     template_dir=TEMPLATE_DIR,
                     sleep_fn=self._interruptible_sleep,
+                    device=f"127.0.0.1:{self._port}" if self._port else None,
                 )
                 self.step_finished.emit(position, bool(clicked))
 

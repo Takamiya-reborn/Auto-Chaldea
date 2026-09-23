@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from auto_chaldea.core.paths import TEMPLATE_DIR
+from auto_chaldea.utils.paths import TEMPLATE_DIR
 
 
 class TemplatesPanel(QWidget):
@@ -45,10 +45,12 @@ class TemplatesPanel(QWidget):
         self._list.clear()
         if not TEMPLATE_DIR.exists():
             return
-        for path in sorted(TEMPLATE_DIR.glob("*.png")):
+        for path in sorted(TEMPLATE_DIR.rglob("*.png")):
             image = QImage(str(path))
             size_text = (
-                f"{image.width()}×{image.height()}" if not image.isNull() else "未知尺寸"
+                f"{image.width()}×{image.height()}"
+                if not image.isNull()
+                else "未知尺寸"
             )
             item = QListWidgetItem(f"{path.stem}\n{size_text}")
             if not image.isNull():

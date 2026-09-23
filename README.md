@@ -14,7 +14,7 @@
 - 使用 ADB 执行坐标点击
 - 使用 `assets/task`、`assets/template` 分离任务配置和图像模板
 - 使用 PySide6 提供设备连接、任务浏览和执行控制界面
-- 从 JSON 加载任务并按模板识别结果顺序执行点击步骤
+- 从 YAML 加载任务并按模板识别结果顺序执行点击步骤
 - 支持任务执行过程中的暂停、继续、停止和状态反馈
 
 目前还没有完整的 Fate/GO 任务流程。README 中标记为“计划”的内容不代表已经实现。
@@ -39,7 +39,7 @@
 
 - 用状态机描述“当前画面 -> 条件判断 -> 动作 -> 下一状态”
 - 支持启动任务、战斗循环、结果确认、返回和异常恢复等通用步骤
-- 任务参数从 JSON 加载，避免把流程硬编码到识别器中
+- 任务参数从 YAML 加载，避免把流程硬编码到识别器中
 - 支持单步执行、模拟运行和断点恢复
 
 ### 第四阶段：桌面工具
@@ -58,7 +58,7 @@ flowchart TB
 		perception[感知层\nrecognizer.py\nOpenCV 模板匹配、ROI、置信度]
 		action[动作层\nadb_click.py\n点击、滑动、输入]
 		workflow[任务执行器\n执行步骤、暂停、停止、状态反馈]
-		config[(任务配置\nassets/task/*.json)]
+		config[(任务配置\nassets/task/*.yaml)]
 		templates[(图像模板\nassets/template/)]
 		ui[桌面控制面板\nui/\nPySide6 控制、任务详情、日志、停止]
 		logs[(截图与运行日志)]
@@ -97,7 +97,7 @@ flowchart TB
 - `core/paths.py`：集中管理资源目录和可执行文件路径
 - `task/`：保存任务配置和状态定义
 - `template/`：保存经过命名和版本管理的模板图片
-- `core/task_repository.py`：加载和筛选 JSON 任务步骤
+- `core/task_repository.py`：加载和筛选 YAML 任务步骤
 - `core/task_executor.py`：执行模板识别和点击步骤
 - `ui/`：提供设备连接、任务浏览、执行控制和运行状态界面
 
@@ -120,7 +120,7 @@ src/auto_chaldea/
 assets/
   platform-tools/      # ADB 运行时文件
   template/            # UI 模板图片
-  task/                # JSON 任务配置
+  task/                # YAML 任务配置
 dev_tools/              # 开发和调试脚本
 tests/                  # 计划：单元测试和识别回归样本
 ```
@@ -144,7 +144,7 @@ tests/                  # 计划：单元测试和识别回归样本
 
 ### M2：任务执行器
 
-- [x] 支持基于 JSON 的模板识别和点击步骤
+- [x] 支持基于 YAML 的模板识别和点击步骤
 - [x] 支持步骤等待、暂停、继续和安全停止
 - [ ] 定义状态、条件、动作、重试和异常恢复模型
 - [ ] 支持滑动、截图和人工确认动作
@@ -173,6 +173,12 @@ uv sync
 uv run auto-chaldea
 ```
 
+需要单独截图时，脚本只会连接并操作本地 TCP 设备。只有一个本地 TCP 设备时可以省略端口；检测到多个设备时指定端口即可消歧：
+
+```powershell
+uv run scripts/scap.py [port]
+```
+
 运行前请确认：
 
 1. Android 设备或模拟器已开启 USB 调试，并允许当前电脑进行调试。
@@ -182,14 +188,30 @@ uv run auto-chaldea
 
 ## 任务配置约定
 
-任务 JSON 建议包含唯一名称、初始状态、状态列表和全局限制。每个状态至少描述：
+任务 YAML 只需包含任务名称和步骤列表，步骤中只有 `template` 是必填字段，其余字段全部可以省略并使用默认值：
 
-- `detect`：需要识别的模板、区域和最低置信度
-- `actions`：要执行的动作及动作间隔
-- `next`：成功后的下一状态
-- `timeout`：等待当前状态的最长时间
-- `retry`：识别或动作失败时的最大重试次数
-- `fallback`：无法恢复时的停止、截图或人工确认策略
+```yaml
+task_name: 示例任务
+steps:
+  - template: attack.png # 必填：模板图片文件名（位于 assets/template/）
+	- template: Center # 特别动作：不识别模板，直接点击设备屏幕正中间
+  - template: skill_1.png # 可选：点击第几个匹配项，默认 0（第一个）
+    index: 1
+	wait_after: 3 # 可选：点击后等待的秒数，默认 1，最小 0
+    region: "0, 0, 1280, 720" # 可选：识别区域 (x1, y1, x2, y2)，默认全屏
+  - template: buster,arts,quick # multi 模式：逗号分隔的多个模板，模糊匹配
+    mode: multi # 可选：single（默认）或 multi
+    count: 2 # multi 模式必填：取置信度 TOP count 的结果逐个点击
+```
+
+最简步骤只需一行 `- template: xxx.png`。字段说明：
+
+- `template`：模板图片文件名，在 `assets/template/` 目录下查找；填写 `Center` 时跳过模板识别并点击设备屏幕正中间；`mode: multi` 时为逗号分隔的多个模板文件名
+- `mode`：识别模式，默认 `single`。`single` 按现有逻辑识别单个模板；`multi` 对多个模板做模糊匹配（跨模板去重，按置信度排序）
+- `count`：`mode: multi` 时必填，取 TOP count 的匹配结果并逐个点击
+- `index`：同屏多个匹配时点击第几个（按位置排序），默认 `0`（仅 single 模式）
+- `wait_after`：该步骤点击后等待的秒数，默认 `1`（即 1000ms），最小为 `0`（multi 模式在全部点击完成后等待）
+- `region`：限制识别范围的区域，格式为 `x1, y1, x2, y2`，省略时全屏识别
 
 不要只依赖固定坐标判断页面状态。固定坐标可以作为动作输出，但页面流转应尽量由识别结果确认。
 

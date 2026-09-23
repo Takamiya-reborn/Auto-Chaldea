@@ -1,20 +1,21 @@
 """右侧任务详情区域：描述、步骤表格和执行控制。"""
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QIntValidator
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
+    QToolButton,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
 
-from auto_chaldea.ui.icons import pause_icon, play_icon, stop_icon, tasks_pixmap
+from auto_chaldea.ui.icons import pause_icon, play_icon, stop_icon, tasks_icon
 from auto_chaldea.ui.theme import GITHUB_DARK
-from auto_chaldea.core.connector import disconnect_device
+from auto_chaldea.utils.connector import disconnect_device
 from auto_chaldea.core.task_repository import valid_steps
 from auto_chaldea.ui.task_table import TaskStepTable
 from auto_chaldea.ui.worker import TaskWorker
@@ -50,14 +51,13 @@ class TaskDetailView(QWidget):
         layout.setAlignment(Qt.AlignCenter)
         layout.setSpacing(12)
 
-        icon_label = QLabel(page)
-        icon_label.setPixmap(
-            tasks_pixmap(GITHUB_DARK["border_strong"], 56).scaled(
-                56, 56, Qt.KeepAspectRatio, Qt.SmoothTransformation
-            )
-        )
-        icon_label.setAlignment(Qt.AlignCenter)
-        layout.addWidget(icon_label)
+        icon_button = QToolButton(page)
+        icon_button.setIcon(tasks_icon(GITHUB_DARK["border_strong"]))
+        icon_button.setIconSize(QSize(56, 56))
+        icon_button.setFixedSize(64, 64)
+        icon_button.setEnabled(False)
+        icon_button.setStyleSheet("QToolButton { background: transparent; border: none; }")
+        layout.addWidget(icon_button, alignment=Qt.AlignCenter)
 
         hint = QLabel("请选择任务")
         hint.setObjectName("emptyHint")
@@ -152,7 +152,7 @@ class TaskDetailView(QWidget):
         name = task.get("task_name") or task.get("name") or "未命名任务"
         steps = valid_steps(task)
         self._title_label.setText(name)
-        self._meta_label.setText(f"来源 {filename}.json · 共 {len(steps)} 个步骤")
+        self._meta_label.setText(f"来源 {filename}.yaml · 共 {len(steps)} 个步骤")
 
         description = task.get("description")
         self._desc_label.setText(description if description else "")
@@ -258,6 +258,7 @@ class TaskDetailView(QWidget):
         if completed:
             self._set_status("已完成", GITHUB_DARK["success"])
         else:
+            self._table.clear_results()
             self._set_status("已停止", GITHUB_DARK["danger"])
 
     # ---- 状态与按钮 ----
