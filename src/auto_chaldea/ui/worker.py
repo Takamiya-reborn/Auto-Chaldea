@@ -5,10 +5,10 @@ import time
 
 from PySide6.QtCore import QThread, Signal
 
-from auto_chaldea.utils.connector import connect_to_device
+from auto_chaldea.utils.adb_device import DeviceDisconnectedError, connect_to_device
 from auto_chaldea.utils.paths import ADB_PATH, TEMPLATE_DIR
-from auto_chaldea.core.task_executor import execute_step
-from auto_chaldea.core.task_repository import valid_steps
+from auto_chaldea.core.task_executor import TIMEOUT_RESULT, execute_step
+from auto_chaldea.core.task_schema import valid_steps
 
 
 class TaskWorker(QThread):
@@ -19,14 +19,17 @@ class TaskWorker(QThread):
     """
 
     step_started = Signal(int)  # 参数：步骤序号（从 0 开始）
-    step_finished = Signal(int, bool)  # 参数：步骤序号、是否执行了点击
+    step_finished = Signal(int, str)  # 参数：步骤序号、结果状态
+    execution_started = Signal(int)  # 参数：执行次数（从 1 开始）
     log_message = Signal(str)
+    device_disconnected = Signal()
     finished_run = Signal(bool)  # 参数：任务是否完整跑完（未被停止）
 
-    def __init__(self, task, port=None, parent=None):
+    def __init__(self, task, port=None, execution_total=1, parent=None):
         super().__init__(parent)
         self._task = task
         self._port = port
+        self._execution_total = execution_total
         self._resume_event = threading.Event()
         self._resume_event.set()
         self._stop_requested = threading.Event()
@@ -79,33 +82,58 @@ class TaskWorker(QThread):
             if self._port:
                 self.log_message.emit(f"正在连接设备 127.0.0.1:{self._port} …")
                 if not connect_to_device(self._port, adb_path=ADB_PATH):
-                    self.log_message.emit("设备连接失败，任务终止。")
+                    self.log_message.emit("模拟器已断开，请重新连接。")
+                    self.device_disconnected.emit()
                     self.finished_run.emit(False)
                     return
                 self.log_message.emit("设备连接成功。")
 
             steps = valid_steps(self._task)
-            for position, step in enumerate(steps):
+            completed = True
+            for execution in range(1, self._execution_total + 1):
                 if self._stop_requested.is_set():
                     break
-                self._wait_while_paused()
-                if self._stop_requested.is_set():
+                self.execution_started.emit(execution)
+                for position, step in enumerate(steps):
+                    if self._stop_requested.is_set():
+                        break
+                    self._wait_while_paused()
+                    if self._stop_requested.is_set():
+                        break
+
+                    self.step_started.emit(position)
+                    clicked = execute_step(
+                        step,
+                        adb_path=ADB_PATH,
+                        template_dir=TEMPLATE_DIR,
+                        sleep_fn=self._interruptible_sleep,
+                        device=f"127.0.0.1:{self._port}" if self._port else None,
+                        should_stop=self._stop_requested.is_set,
+                    )
+                    if clicked == TIMEOUT_RESULT:
+                        result = "timeout"
+                    elif clicked:
+                        result = "executed"
+                    else:
+                        result = "failed"
+                    self.step_finished.emit(position, result)
+
+                    if self._stop_requested.is_set():
+                        break
+                    if not clicked:
+                        self.log_message.emit(
+                            f"步骤 {position + 1} 未等到目标（超时或识别失败），任务终止。"
+                        )
+                        completed = False
+                        break
+                if not completed:
                     break
 
-                self.step_started.emit(position)
-                clicked = execute_step(
-                    step,
-                    adb_path=ADB_PATH,
-                    template_dir=TEMPLATE_DIR,
-                    sleep_fn=self._interruptible_sleep,
-                    device=f"127.0.0.1:{self._port}" if self._port else None,
-                )
-                self.step_finished.emit(position, bool(clicked))
-
-                if self._stop_requested.is_set():
-                    break
-
-            self.finished_run.emit(not self._stop_requested.is_set())
+            self.finished_run.emit(completed and not self._stop_requested.is_set())
+        except DeviceDisconnectedError as error:
+            self.log_message.emit(f"模拟器已断开：{error}")
+            self.device_disconnected.emit()
+            self.finished_run.emit(False)
         except Exception as error:  # noqa: BLE001 - 后台线程需要兜底并回报界面
             self.log_message.emit(f"任务异常终止：{error}")
             self.finished_run.emit(False)

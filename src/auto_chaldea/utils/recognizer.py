@@ -3,13 +3,14 @@ import numpy as np
 import subprocess
 from pathlib import Path
 
+from auto_chaldea.utils.adb_device import DeviceDisconnectedError
 from auto_chaldea.utils.paths import ADB_PATH, TEMPLATE_DIR
 
 DEFAULT_TEMPLATE_SUFFIX = ".png"
 
 
 def _load_template(template_dir, template_path):
-    """Load a template image, appending the default suffix when none is given."""
+    """读取模板图像，缺少后缀时默认使用 PNG。"""
     path = Path(str(template_path))
     if not path.suffix:
         path = path.with_suffix(DEFAULT_TEMPLATE_SUFFIX)
@@ -22,19 +23,22 @@ def _load_template(template_dir, template_path):
 
 
 def _capture_screen(adb_path, region, device=None):
-    """Capture the device screen and return the (possibly cropped) search area."""
+    """截取设备屏幕，并按区域裁剪。"""
     cmd = [str(adb_path)]
     if device:
         cmd += ["-s", str(device)]
     cmd += ["exec-out", "screencap", "-p"]
-    res = subprocess.run(cmd, capture_output=True)
+    try:
+        res = subprocess.run(cmd, capture_output=True, timeout=15)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise DeviceDisconnectedError("无法读取模拟器屏幕") from error
     if res.returncode != 0:
-        return None
+        raise DeviceDisconnectedError("模拟器已断开")
 
     img_array = np.frombuffer(res.stdout, dtype=np.uint8)
     screen = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
     if screen is None:
-        return None
+        raise DeviceDisconnectedError("无法解析模拟器屏幕")
 
     search_area = screen
     offset_x, offset_y = 0, 0
@@ -47,7 +51,7 @@ def _capture_screen(adb_path, region, device=None):
 
 
 def _prepare_match(template_path, adb_path, template_dir, region, device=None):
-    """Capture the screen and prepare template-matching inputs."""
+    """准备模板匹配所需的数据。"""
     captured = _capture_screen(adb_path, region, device)
     if captured is None:
         return None
@@ -65,8 +69,10 @@ def _prepare_match(template_path, adb_path, template_dir, region, device=None):
     return match_result, template_width, template_height, offset_x, offset_y
 
 
-def _extract_matches(res_match, template_width, template_height, offset_x, offset_y, threshold):
-    """Greedily extract non-overlapping matches above the threshold from a match result."""
+def _extract_matches(
+    res_match, template_width, template_height, offset_x, offset_y, threshold
+):
+    """提取阈值以上且互不重叠的匹配结果。"""
     matches = []
     while True:
         _, max_val, _, max_loc = cv2.minMaxLoc(res_match)
@@ -90,14 +96,16 @@ def _extract_matches(res_match, template_width, template_height, offset_x, offse
         x1 = max(0, max_loc[0] - template_width // 2)
         y1 = max(0, max_loc[1] - template_height // 2)
         x2 = min(res_match.shape[1], max_loc[0] + template_width + template_width // 2)
-        y2 = min(res_match.shape[0], max_loc[1] + template_height + template_height // 2)
+        y2 = min(
+            res_match.shape[0], max_loc[1] + template_height + template_height // 2
+        )
         res_match[y1:y2, x1:x2] = 0.0
 
     return matches
 
 
 def _rects_overlap(a, b):
-    """Return True if two matches (with left/top/width/height) cover overlapping areas."""
+    """判断两个匹配区域是否重叠。"""
     return (
         a["left"] < b["left"] + b["width"]
         and b["left"] < a["left"] + a["width"]
@@ -114,7 +122,7 @@ def find_all_matches(
     threshold=0.8,
     device=None,
 ):
-    """Return all valid matches for the given template, sorted by screen position."""
+    """查找模板的全部匹配，并按屏幕位置排序。"""
     prepared = _prepare_match(template_path, adb_path, template_dir, region, device)
     if prepared is None:
         return []
@@ -123,9 +131,7 @@ def find_all_matches(
 
     matches = _extract_matches(res_match, w, h, offset_x, offset_y, threshold)
     matches.sort(key=lambda m: (m["y"], m["x"]))
-    return [
-        {"x": m["x"], "y": m["y"], "confidence": m["confidence"]} for m in matches
-    ]
+    return [{"x": m["x"], "y": m["y"], "confidence": m["confidence"]} for m in matches]
 
 
 def find_all_matches_multi(
@@ -137,12 +143,7 @@ def find_all_matches_multi(
     threshold=0.8,
     device=None,
 ):
-    """Match multiple templates against one screenshot and return the top N matches.
-
-    Each template is matched against a single screen capture; overlapping hits from
-    different templates are deduplicated (higher confidence wins). Results are sorted
-    top-to-bottom, then left-to-right, and truncated to ``top_n`` (all if None).
-    """
+    """在同一张截图中匹配多个模板并返回前 N 个结果。"""
     if isinstance(template_paths, str):
         template_paths = [template_paths]
 
@@ -158,15 +159,20 @@ def find_all_matches_multi(
             continue
 
         template_height, template_width = template.shape[:2]
-        if search_area.shape[0] < template_height or search_area.shape[1] < template_width:
+        if (
+            search_area.shape[0] < template_height
+            or search_area.shape[1] < template_width
+        ):
             continue
 
         res_match = cv2.matchTemplate(search_area, template, cv2.TM_CCOEFF_NORMED)
-        for match in _extract_matches(res_match, template_width, template_height, offset_x, offset_y, threshold):
+        for match in _extract_matches(
+            res_match, template_width, template_height, offset_x, offset_y, threshold
+        ):
             match["template"] = str(template_path)
             candidates.append(match)
 
-    # Deduplicate across templates: keep the higher-confidence match when hits overlap.
+    # 重叠时保留置信度更高的结果。
     candidates.sort(key=lambda m: m["confidence"], reverse=True)
     accepted = []
     for candidate in candidates:
@@ -197,7 +203,7 @@ def find_best_match(
     threshold=0.8,
     device=None,
 ):
-    """Return the highest-confidence match for the given template, if it exceeds the threshold."""
+    """返回超过阈值的最高置信度结果。"""
     prepared = _prepare_match(template_path, adb_path, template_dir, region, device)
     if prepared is None:
         return None

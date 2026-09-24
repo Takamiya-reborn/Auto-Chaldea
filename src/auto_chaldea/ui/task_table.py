@@ -1,4 +1,4 @@
-"""Table widget for displaying task steps and execution results."""
+"""任务步骤和执行结果表格。"""
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
@@ -11,11 +11,11 @@ from PySide6.QtWidgets import (
 
 from auto_chaldea.ui.theme import GITHUB_DARK
 
-HEADERS = ("#", "模板", "匹配序号", "区域", "点击后等待", "模式", "结果")
+HEADERS = ("#", "模板", "匹配序号", "区域", "模式", "结果")
 
 
 class TaskStepTable(QTableWidget):
-    """Render task steps and expose small operations used by the detail view."""
+    """显示步骤并提供结果更新接口。"""
 
     def __init__(self, parent=None):
         super().__init__(0, len(HEADERS), parent)
@@ -28,16 +28,13 @@ class TaskStepTable(QTableWidget):
     def set_steps(self, steps):
         self.setRowCount(len(steps))
         for row, step in enumerate(steps):
-            wait_value = step.get("wait_after")
-            wait_after = 1 if wait_value in (None, "") else wait_value
             region = step.get("region") or "全屏"
-            mode = step.get("mode") or "Single"
+            mode = step.get("mode") or "single"
             values = (
                 str(row + 1),
                 str(step.get("template", "")),
                 str(step.get("index", 0)),
                 str(region),
-                f"{wait_after} 秒",
                 str(mode),
                 "—",
             )

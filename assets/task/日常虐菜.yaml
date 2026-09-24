@@ -1,22 +1,24 @@
 task_name: 日常虐菜
+prerequisite: 1号位所长，2号位摩根，三号位杀狐，御主穿CD服
 steps:
+  # Start Phase
+  - template: 基本/选助战
+    region: 右
+  - template: 基本/开始任务
+    timeout: 3
   # Turn 1
   - template: 技能池/skill_2
+    region: 下
   - template: Center
   - template: 技能池/skill_3
     index: 1
-  - template: Center
-    wait_after: 3
   - template: 角色池/奥尔加玛丽/1
-    wait_after: 5
+  - template: Center
   - template: 基本/attack
-    wait_after: 5
   - template: 宝具/既已过去的人理之终
-    wait_after: 2
   - template: 基本/buster,基本/arts,基本/quick
     mode: multi
     count: 2
-    wait_after: 30
   # Turn 2
   - template: 技能池/skill_1
   - template: Center
@@ -24,17 +26,18 @@ steps:
   - template: Center
   - template: 技能池/skill_2
     index: 0
+  - template: 角色池/摩根/冬之女王
   - template: Center
   - template: 技能池/skill_2
-  - template: Center
   - template: 角色池/奥尔加玛丽/1
+  - template: Center
   - template: 技能池/skill_4
-  - template: Center
   - template: 角色池/奥尔加玛丽/1
+  - template: Center
   - template: 基本/御主技能
   - template: 技能池/skill_1
-  - template: Center
   - template: 角色池/奥尔加玛丽/1
+  - template: Center
   - template: 技能池/skill_2
   - template: Center
   - template: 技能池/skill_3
@@ -43,7 +46,6 @@ steps:
   - template: 基本/buster
   - template: 基本/quick
   - template: 基本/arts
-    wait_after: 20
   # Turn 3
   - template: 技能池/skill_1
   - template: Center
@@ -52,5 +54,8 @@ steps:
   - template: 基本/buster
     mode: multi
     count: 2
-    wait_after: 20
   # End Phase
+  - template: 基本/请点击游戏界面
+  - template: 基本/请点击游戏界面
+  - template: 基本/下一步
+  - template: 基本/连续出击

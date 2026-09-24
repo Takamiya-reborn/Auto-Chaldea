@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
-from auto_chaldea.utils.connector import connect_to_device
+from auto_chaldea.utils.adb_device import connect_to_device
 from auto_chaldea.utils.paths import ADB_PATH
 from auto_chaldea.ui.icons import device_icon
 from auto_chaldea.ui.theme import GITHUB_DARK
@@ -24,7 +24,7 @@ class ConnectDialog(QDialog):
 
     connected = Signal(int)  # 参数：连接成功的端口号
 
-    def __init__(self, parent=None):
+    def __init__(self, initial_port=None, notice=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("连接设备 - Auto-Chaldea")
         self.setFixedWidth(380)
@@ -60,12 +60,16 @@ class ConnectDialog(QDialog):
         self._port_edit.setPlaceholderText("例如 5555")
         self._port_edit.setValidator(QIntValidator(1, 65535, self))
         self._port_edit.setAlignment(Qt.AlignCenter)
+        if initial_port is not None:
+            self._port_edit.setText(str(initial_port))
         layout.addWidget(self._port_edit)
 
         self._status_label = QLabel(" ", self)
         self._status_label.setObjectName("statusLabel")
         self._status_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self._status_label)
+        if notice:
+            self._set_status(notice, GITHUB_DARK["attention"])
         layout.addSpacing(6)
 
         buttons = QHBoxLayout()

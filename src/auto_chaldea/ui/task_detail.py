@@ -1,9 +1,10 @@
 """右侧任务详情区域：描述、步骤表格和执行控制。"""
 
-from PySide6.QtCore import QSize, Qt
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QIntValidator
 from PySide6.QtWidgets import (
     QHBoxLayout,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QPushButton,
@@ -15,8 +16,8 @@ from PySide6.QtWidgets import (
 
 from auto_chaldea.ui.icons import pause_icon, play_icon, stop_icon, tasks_icon
 from auto_chaldea.ui.theme import GITHUB_DARK
-from auto_chaldea.utils.connector import disconnect_device
-from auto_chaldea.core.task_repository import valid_steps
+from auto_chaldea.utils.adb_device import disconnect_device
+from auto_chaldea.core.task_schema import valid_steps
 from auto_chaldea.ui.task_table import TaskStepTable
 from auto_chaldea.ui.worker import TaskWorker
 
@@ -27,12 +28,16 @@ class TaskDetailView(QWidget):
     底部操作栏提供设备端口输入和执行 / 暂停 / 停止按钮。
     """
 
+    device_disconnected = Signal(int)
+
     def __init__(self, parent=None):
         super().__init__(parent)
 
         self._task = None
         self._filename = ""
         self._worker = None
+        self._execution_total = 0
+        self._execution_current = 0
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -56,7 +61,9 @@ class TaskDetailView(QWidget):
         icon_button.setIconSize(QSize(56, 56))
         icon_button.setFixedSize(64, 64)
         icon_button.setEnabled(False)
-        icon_button.setStyleSheet("QToolButton { background: transparent; border: none; }")
+        icon_button.setStyleSheet(
+            "QToolButton { background: transparent; border: none; }"
+        )
         layout.addWidget(icon_button, alignment=Qt.AlignCenter)
 
         hint = QLabel("请选择任务")
@@ -101,12 +108,14 @@ class TaskDetailView(QWidget):
 
         port_label = QLabel("设备端口")
         port_label.setObjectName("portLabel")
+        port_label.setVisible(False)
         bar.addWidget(port_label)
 
         self._port_edit = QLineEdit(self)
         self._port_edit.setPlaceholderText("例如 5555，留空则跳过连接")
         self._port_edit.setValidator(QIntValidator(1, 65535, self))
         self._port_edit.setFixedWidth(190)
+        self._port_edit.setVisible(False)
         bar.addWidget(self._port_edit)
 
         self._status_label = QLabel("就绪", self)
@@ -144,6 +153,8 @@ class TaskDetailView(QWidget):
         """切换当前展示的任务；task 为 None 时回到空状态。"""
         self._task = task
         self._filename = filename
+        self._execution_total = 0
+        self._execution_current = 0
 
         if task is None:
             self._stack.setCurrentIndex(0)
@@ -154,9 +165,9 @@ class TaskDetailView(QWidget):
         self._title_label.setText(name)
         self._meta_label.setText(f"来源 {filename}.yaml · 共 {len(steps)} 个步骤")
 
-        description = task.get("description")
-        self._desc_label.setText(description if description else "")
-        self._desc_label.setVisible(bool(description))
+        prerequisite = task.get("prerequisite") or task.get("description")
+        self._desc_label.setText(f"执行要求：{prerequisite}" if prerequisite else "")
+        self._desc_label.setVisible(bool(prerequisite))
 
         self._table.set_steps(steps)
         self._stack.setCurrentIndex(1)
@@ -190,6 +201,18 @@ class TaskDetailView(QWidget):
             self._set_status("任务没有可执行的步骤", GITHUB_DARK["attention"])
             return
 
+        execution_total, accepted = QInputDialog.getInt(
+            self,
+            "执行次数",
+            "请输入执行次数：",
+            1,
+            1,
+            9999,
+            1,
+        )
+        if not accepted:
+            return
+
         port = self._port_edit.text().strip()
         if port:
             try:
@@ -204,9 +227,13 @@ class TaskDetailView(QWidget):
                 return
 
         self._table.clear_results()
-        self._worker = TaskWorker(self._task, port or None)
+        self._execution_total = execution_total
+        self._execution_current = 1
+        self._worker = TaskWorker(self._task, port or None, execution_total)
+        self._worker.execution_started.connect(self._on_execution_started)
         self._worker.step_started.connect(self._on_step_started)
         self._worker.step_finished.connect(self._on_step_finished)
+        self._worker.device_disconnected.connect(self._on_device_disconnected)
         self._worker.log_message.connect(
             lambda message: self._set_status(message, GITHUB_DARK["muted"])
         )
@@ -242,11 +269,22 @@ class TaskDetailView(QWidget):
         self._table.selectRow(position)
         self._set_status(f"运行中 · 步骤 {position + 1}/{total}", GITHUB_DARK["accent"])
 
-    def _on_step_finished(self, position, clicked):
-        if clicked:
+    def _on_execution_started(self, execution):
+        self._execution_current = execution
+        self._set_status("运行中", GITHUB_DARK["accent"])
+
+    def _on_step_finished(self, position, result):
+        if result == "timeout":
+            self._table.set_result(position, "超时", GITHUB_DARK["timeout"])
+        elif result == "executed":
             self._table.set_result(position, "已执行", GITHUB_DARK["success"])
         else:
             self._table.set_result(position, "未匹配", GITHUB_DARK["danger"])
+
+    def _on_device_disconnected(self):
+        port = self._port_edit.text().strip()
+        if port:
+            self.device_disconnected.emit(int(port))
 
     def _on_finished(self, completed):
         if self._worker is not None:
@@ -273,6 +311,10 @@ class TaskDetailView(QWidget):
         self._port_edit.setEnabled(not running)
 
     def _set_status(self, text, color=None):
+        if self._execution_total:
+            text = (
+                f"当前执行：{self._execution_current}/{self._execution_total} · {text}"
+            )
         if color:
             self._status_label.setText(f'<span style="color:{color};">●</span> {text}')
         else:

@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from auto_chaldea.utils.paths import TASK_DIR
-from auto_chaldea.core.task_repository import load_task_files
+from auto_chaldea.core.task_loader import load_task_files
 from auto_chaldea.ui.icons import dir_node_icon, refresh_icon, task_node_icon
 from auto_chaldea.ui.theme import GITHUB_DARK
 

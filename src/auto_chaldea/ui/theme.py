@@ -24,6 +24,7 @@ GITHUB_DARK = {
     "success_hover": "#2ea043",
     "danger": "#f85149",
     "attention": "#d29922",
+    "timeout": "#d2a8ff",
 }
 
 

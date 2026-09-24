@@ -1,229 +1,229 @@
 # Auto-Chaldea
 
-基于 OpenCV、ADB 和 PySide6 的 Fate/Grand Order（Fate/GO）桌面辅助工具，用于减少重复、机械的操作。项目的核心思路是：通过截图识别当前画面，再由任务状态机决定下一步动作，最后使用 ADB 执行点击或滑动。
+Auto-Chaldea 是一个基于 ADB、OpenCV 和 PySide6 的 FGO 自动化辅助工具，核心思路是：
 
-> **定位与边界**：本项目仅面向个人设备上的辅助研究与重复操作自动化。请遵守游戏服务条款、当地法律及设备安全要求，不用于绕过安全机制、网络对抗或影响其他玩家的行为。涉及账号风险的操作应默认人工确认。
+- 通过 ADB 连接 Android 设备/模拟器
+- 截图并对当前画面进行模板识别
+- 根据 YAML 任务步骤决定下一步动作
+- 通过 ADB 执行点击、滑动和其它输入操作
+- 在桌面端统一管理设备、任务、日志和执行状态
 
-## 当前状态
+它适合用于处理重复性较强、规则明确的游戏操作，并尽量通过识别画面来驱动流程，减少对玩家的精神污染。
 
-项目处于早期开发阶段，已经搭好以下基础能力：
+> 使用范围：本项目用于个人设备上的辅助研究与重复操作自动化。请遵守游戏服务条款、当地法律以及账号安全要求，不要用于绕过安全机制或影响其他玩家。
 
-- 通过本地 ADB 连接 Android 设备或模拟器
-- 通过 ADB 截取当前屏幕
-- 使用 OpenCV 模板匹配查找单个或多个 UI 元素
-- 使用 ADB 执行坐标点击
-- 使用 `assets/task`、`assets/template` 分离任务配置和图像模板
-- 使用 PySide6 提供设备连接、任务浏览和执行控制界面
-- 从 YAML 加载任务并按模板识别结果顺序执行点击步骤
-- 支持任务执行过程中的暂停、继续、停止和状态反馈
+## 主要功能
 
-目前还没有完整的 Fate/GO 任务流程。README 中标记为“计划”的内容不代表已经实现。
+### 1. ADB 设备连接与控制
 
-## 目标
+- 连接本地 Android 设备或模拟器
+- 自动探测可用的 ADB 设备
+- 截取当前屏幕并保存图片
+- 通过坐标点击、滑动等方式执行操作
+- 监控设备状态与断开事件
 
-### 第一阶段：可观测、可停止
+### 2. 模板识别引擎
 
-- 提供设备连接、截图预览和 ADB 状态检查
-- 记录每次识别结果、点击动作、置信度和错误原因
-- 支持全局暂停、停止和超时退出
-- 所有高风险或不可逆操作都提供人工确认选项
+- 基于 OpenCV 的模板匹配识别 UI 元素
+- 支持全屏识别和 ROI（感兴趣区域）识别
+- 支持单模板识别和多模板识别
+- 支持按置信度排序、索引点击和重复匹配处理
+- 可配置识别区域、重试间隔和超时
 
-### 第二阶段：稳定识别
+### 3. YAML 任务系统
 
-- 建立按分辨率、界面和语言组织的模板库
-- 支持 ROI（感兴趣区域）、多尺度匹配和颜色/轮廓等辅助识别
-- 为模板设置置信度阈值、有效区域和失败处理策略
-- 识别失败时保存截图，便于复盘和补充模板
+- 任务步骤以 YAML 配置，放在 `assets/task/`
+- 每个步骤都可以定义模板、区域、等待、重试与超时
+- 支持 `single` / `multi` 两种识别模式
+- 允许通过 `Center` 直接点击屏幕中心，跳过模板识别
+- 任务执行器会按顺序执行，直到目标出现、点击成功或任务失败
 
-### 第三阶段：任务编排
+### 4. 桌面化执行界面
 
-- 用状态机描述“当前画面 -> 条件判断 -> 动作 -> 下一状态”
-- 支持启动任务、战斗循环、结果确认、返回和异常恢复等通用步骤
-- 任务参数从 YAML 加载，避免把流程硬编码到识别器中
-- 支持单步执行、模拟运行和断点恢复
+- 设备选择与连接控制
+- 任务列表与任务详情查看
+- 实时日志与状态反馈
+- 执行任务前可设置重复执行次数（1 到 9999 次）
+- 执行过程中显示当前执行次数与总次数
+- 暂停、继续、停止等运行控制
+- 任务执行过程中可查看当前识别结果和动作状态
 
-### 第四阶段：桌面工具
+### 5. 任务脚本与调试工具
 
-- 使用 PySide6 提供设备选择、任务选择、日志和实时截图面板
-- 展示当前状态、最近一次识别结果和操作倒计时
-- 提供模板测试工具：选择截图区域、测试阈值、预览匹配结果
-- 提供安全的停止入口，关闭窗口时主动结束正在运行的任务
+- `scripts/` 目录下的脚本属于开发辅助工具，不参与正式项目构成
+- 这些脚本用于在开发过程中抓取屏幕、生成/校验模板、调试识别逻辑
+- 正式项目功能由 `src/auto_chaldea/` 和 `assets/` 负责，而不是脚本目录本身
+- 开发者可在需要时手动运行脚本来补充 `assets/template/`，并据此迭代任务配置
 
-## 设计
-
-```mermaid
-flowchart TB
-		device[Android 设备 / 模拟器]
-		adb[ADB 层\nconnector.py\n连接、设备状态、截图、输入]
-		perception[感知层\nrecognizer.py\nOpenCV 模板匹配、ROI、置信度]
-		action[动作层\nadb_click.py\n点击、滑动、输入]
-		workflow[任务执行器\n执行步骤、暂停、停止、状态反馈]
-		config[(任务配置\nassets/task/*.yaml)]
-		templates[(图像模板\nassets/template/)]
-		ui[桌面控制面板\nui/\nPySide6 控制、任务详情、日志、停止]
-		logs[(截图与运行日志)]
-		human{人工确认 /\n安全停止}
-
-		device <--> adb
-		adb -->|屏幕截图| perception
-		templates --> perception
-		perception -->|识别结果| workflow
-		config --> workflow
-		workflow -->|点击 / 滑动 / 输入| action
-		action --> adb
-		adb -->|执行动作| device
-		workflow --> logs
-		perception -->|失败截图| logs
-		ui <--> workflow
-		ui <--> adb
-		workflow --> human
-		human -->|继续或停止| workflow
-
-		classDef implemented fill:#1f3a2a,stroke:#3fb950,color:#aff5b4;
-		classDef planned fill:#3b2d1a,stroke:#d29922,color:#ffdf9e,stroke-dasharray: 5 5;
-		class adb,perception,action,device,templates implemented;
-		class workflow,config,ui implemented;
-		class logs,human planned;
-		linkStyle default stroke:#8b949e,stroke-width:2.5px;
-```
-
-实线节点表示当前已有基础能力，虚线节点表示后续规划能力。
-
-建议保持以下职责边界：
-
-- `core/connector.py`：只负责设备连接和设备状态，不负责任务逻辑
-- `core/recognizer.py`：只负责截图和识别结果，不直接执行点击
-- `core/adb_click.py`：集中封装点击、滑动等输入动作
-- `core/paths.py`：集中管理资源目录和可执行文件路径
-- `task/`：保存任务配置和状态定义
-- `template/`：保存经过命名和版本管理的模板图片
-- `core/task_repository.py`：加载和筛选 YAML 任务步骤
-- `core/task_executor.py`：执行模板识别和点击步骤
-- `ui/`：提供设备连接、任务浏览、执行控制和运行状态界面
-
-## 目录规划
+## 目录结构
 
 ```text
-src/auto_chaldea/
-  core/
-    connector.py       # ADB 连接
-    adb_click.py       # 点击和输入动作
-    recognizer.py      # 截图与 OpenCV 识别
-		paths.py            # 路径管理
-		task_repository.py  # 任务配置读取与步骤筛选
-		task_executor.py    # 任务步骤执行
-	ui/                   # PySide6 界面
-		connect_dialog.py   # 启动时的设备连接
-		main_window.py      # 主窗口和面板切换
-		task_detail.py      # 任务详情和执行控制
-		task_table.py       # 任务步骤表格
-assets/
-  platform-tools/      # ADB 运行时文件
-  template/            # UI 模板图片
-  task/                # YAML 任务配置
-dev_tools/              # 开发和调试脚本
-tests/                  # 计划：单元测试和识别回归样本
+.
+├── main.py                  # 程序入口
+├── pyproject.toml           # uv / Python 依赖配置
+├── README.md                # 项目说明
+├── src/
+│   └── auto_chaldea/
+│       ├── __init__.py
+│       ├── core/
+│       │   ├── task_executor.py
+│       │   ├── task_loader.py
+│       │   ├── task_schema.py
+│       │   └── ...
+│       ├── ui/
+│       │   ├── main_window.py
+│       │   ├── task_panel.py
+│       │   ├── task_detail.py
+│       │   └── ...
+│       └── utils/
+│           ├── adb_device.py
+│           ├── paths.py
+│           └── recognizer.py
+├── assets/
+│   ├── platform-tools/
+│   ├── qss/
+│   ├── task/
+│   └── template/
+├── scripts/
+│   ├── scap.py              # 开发用截图脚本，生成模板或校验画面
+│   └── ...                  # 其它开发辅助脚本
+└── uv.lock
 ```
 
-## 开发路线
+## 运行方式
 
-### M0：基础设施
+本项目使用 Python 3.13 与 uv 管理依赖。
 
-- [x] 建立 uv 项目和 Python 入口
-- [x] 接入 OpenCV、NumPy 和 PySide6 依赖
-- [x] 封装 ADB 连接、截图、模板匹配和点击
-- [ ] 增加统一日志和异常类型
-- [x] 增加设备探测、连接状态和超时检查
-
-### M1：识别实验台
-
-- [ ] 保存原始截图和识别调试图
-- [ ] 支持 ROI、阈值和模板尺寸校验
-- [ ] 统计模板匹配的误报、漏报和耗时
-- [ ] 为常见分辨率建立最小回归样本
-
-### M2：任务执行器
-
-- [x] 支持基于 YAML 的模板识别和点击步骤
-- [x] 支持步骤等待、暂停、继续和安全停止
-- [ ] 定义状态、条件、动作、重试和异常恢复模型
-- [ ] 支持滑动、截图和人工确认动作
-- [ ] 用虚拟截图测试任务状态迁移
-
-### M3：首个可用流程
-
-- [ ] 从主界面进入目标任务
-- [ ] 处理战斗中的固定操作
-- [ ] 识别结算画面并安全返回
-- [ ] 任务结束后输出摘要和失败截图
-
-### M4：桌面界面与维护
-
-- [x] 设备和任务选择
-- [x] 实时日志和任务状态展示
-- [ ] 模板调试与阈值配置
-- [ ] 配置版本化、回归测试和发布说明
-
-## 运行与开发
-
-项目使用 Python `>=3.13` 和 uv：
+### 安装依赖
 
 ```powershell
 uv sync
+```
+
+### 启动桌面应用
+
+```powershell
 uv run auto-chaldea
 ```
 
-需要单独截图时，脚本只会连接并操作本地 TCP 设备。只有一个本地 TCP 设备时可以省略端口；检测到多个设备时指定端口即可消歧：
+### 打包 Windows 程序
+
+确保已安装依赖并配置好 Visual Studio C++ 编译环境后，执行：
+
+```powershell
+.\scripts\nuitka.ps1
+```
+
+### 开发期间的辅助脚本
 
 ```powershell
 uv run scripts/scap.py [port]
 ```
 
-运行前请确认：
+功能是截图并放置在`assets/template/`
+如果本机只有一个 ADB 设备，可省略端口；如果有多个设备，请显式指定端口来区分。
 
-1. Android 设备或模拟器已开启 USB 调试，并允许当前电脑进行调试。
-2. `assets/platform-tools/adb.exe` 存在，且设备可以被 ADB 识别。
-3. 模板图片来自与目标设备一致的分辨率、缩放比例和语言设置。
-4. 首次运行使用低风险、可人工观察的流程，并保留停止任务的方式。
+### 设置任务执行次数
 
-## 任务配置约定
+在任务详情区域点击“执行”后，可在弹窗中输入执行次数，范围为 1 到 9999 次。这里的次数表示完整任务的重复次数，每次都会从第一个步骤重新开始执行。
 
-任务 YAML 只需包含任务名称和步骤列表，步骤中只有 `template` 是必填字段，其余字段全部可以省略并使用默认值：
+运行期间，状态栏会显示当前执行次数与总次数，并可使用“暂停”、“继续”或“停止”控制任务。任务执行失败或设备断开时会提前终止后续执行。
+
+## 任务 YAML 介绍
+
+任务配置位于 `assets/task/`，一个最小示例如下：
 
 ```yaml
 task_name: 示例任务
+prerequisite: 需要准备指定从者和御主礼装
 steps:
-  - template: attack.png # 必填：模板图片文件名（位于 assets/template/）
-	- template: Center # 特别动作：不识别模板，直接点击设备屏幕正中间
-  - template: skill_1.png # 可选：点击第几个匹配项，默认 0（第一个）
+  - template: attack.png
+  - template: Center
+  - template: skill_1.png
     index: 1
-	wait_after: 3 # 可选：点击后等待的秒数，默认 1，最小 0
-    region: "0, 0, 1280, 720" # 可选：识别区域 (x1, y1, x2, y2)，默认全屏
-  - template: buster,arts,quick # multi 模式：逗号分隔的多个模板，模糊匹配
-    mode: multi # 可选：single（默认）或 multi
-    count: 2 # multi 模式必填：取置信度 TOP count 的结果逐个点击
+    region: "0, 0, 1280, 720"
+    step_interval: 1.0
+    timeout: 30
+  - template: buster,arts,quick
+    mode: multi
+    count: 2
 ```
 
-最简步骤只需一行 `- template: xxx.png`。字段说明：
+### 字段说明
 
-- `template`：模板图片文件名，在 `assets/template/` 目录下查找；填写 `Center` 时跳过模板识别并点击设备屏幕正中间；`mode: multi` 时为逗号分隔的多个模板文件名
-- `mode`：识别模式，默认 `single`。`single` 按现有逻辑识别单个模板；`multi` 对多个模板做模糊匹配（跨模板去重，按置信度排序）
-- `count`：`mode: multi` 时必填，取 TOP count 的匹配结果并逐个点击
-- `index`：同屏多个匹配时点击第几个（按位置排序），默认 `0`（仅 single 模式）
-- `wait_after`：该步骤点击后等待的秒数，默认 `1`（即 1000ms），最小为 `0`（multi 模式在全部点击完成后等待）
-- `region`：限制识别范围的区域，格式为 `x1, y1, x2, y2`，省略时全屏识别
+- `prerequisite`：任务执行前需要满足的条件，会显示在任务详情区域；支持普通文本和多行文本
+- `template`：模板图片文件名，默认从 `assets/template/` 中查找；如果为 `Center`，则直接点击屏幕中心
+- `mode`：识别模式，默认 `single`；`multi` 表示同时匹配多个模板, 例如：要在三色卡中任选几张、在不同狗粮中任选20张
+- `count`：在 `multi` 模式下，按置信度排名取前 `count` 个结果依次点击
+- `index`：同屏多个匹配时的点击顺序，默认取第一个匹配
+- `region`：识别区域，可传 `x1, y1, x2, y2`，也支持 `左`、`右`、`上`、`下`、`左上` 等别名
+- `step_interval`：点击成功后等待多久再进入下一步，默认约 `1.0` 秒
+- `timeout`：单步识别超时，超过后任务失败并终止
+- `retry_interval` 和 `max_retry_interval`：未匹配到目标时的重试间隔与上限
 
-不要只依赖固定坐标判断页面状态。固定坐标可以作为动作输出，但页面流转应尽量由识别结果确认。
+## 开发上手建议
 
-## 安全与可靠性原则
+### 1. 先理解主流程
 
-- 默认先截图确认，再执行动作；识别置信度不足时停止或请求人工确认。
-- 每个动作都应有超时、日志和可中断路径。
-- 不保存账号密码、令牌或与任务无关的个人数据。
-- 不通过高频操作规避限制，不修改游戏客户端，不注入进程。
-- 任务失败时优先停止并保存现场，而不是无限重试。
-- 用离线截图和模拟设备测试识别逻辑，减少对真实账号的影响。
+这套项目的核心链路可以概括为：
 
-## 贡献与问题记录
+`ADB 连接 / 屏幕截图 -> 模板识别 -> 任务步骤执行 -> 点击/滑动 -> 游戏状态变化`
 
-提交新的任务或模板时，请同时说明：设备分辨率、系统缩放、游戏语言、模板来源、匹配阈值和已知限制。识别问题应附上脱敏后的截图、日志和复现步骤，避免只报告“点错了”。
+主要代码入口：
+
+- `main.py`：程序启动入口
+- `src/auto_chaldea/__init__.py`：导出 `main` 与常用执行函数
+- `src/auto_chaldea/core/task_loader.py`：加载任务
+- `src/auto_chaldea/core/task_executor.py`：执行任务步骤
+- `src/auto_chaldea/utils/adb_device.py`：ADB 设备连接、点击、滑动和尺寸读取
+- `src/auto_chaldea/utils/recognizer.py`：识别逻辑
+- `src/auto_chaldea/ui/`：桌面端界面
+
+### 2. 添加一个新任务
+
+1. 在 `assets/task/` 下新增 YAML 文件
+2. 将对应模板图片放进 `assets/template/`
+3. 确保模板名和 YAML 中的 `template` 字段一致
+4. 启动程序后在任务列表中选择并执行
+
+### 3. 调整识别逻辑
+
+- 识别逻辑主要在 `src/auto_chaldea/utils/recognizer.py`
+- 区域逻辑与模板常量在 `task_schema.py` 等模块中处理
+- 若需要修改点击方式、截图流程或设备操作，直接查看 `src/auto_chaldea/utils/adb_device.py`
+
+### 4. 修改界面
+
+- 主窗口入口：`src/auto_chaldea/ui/main_window.py`
+- 任务列表面板：`task_panel.py`
+- 任务详情/执行控制：`task_detail.py`
+- 设备状态监控：`device_monitor.py`
+
+### 5. 调试建议
+
+- 先用 `scripts/scap.py` 抓取一张目标画面，作为模板或识别样本
+- 把截图保存到 `assets/template/`，并按任务命名/归类，确保后续 YAML 中引用正确
+- 先用小范围 `region` 测试识别，再扩大到完整任务
+- 对于高风险或流程变化较大的一步，先单步调试，避免直接全流程执行
+- `scripts/` 中的内容用于开发者在调试时临时使用，不应被当成正式运行入口或核心应用功能
+
+## 说明
+
+这个仓库更像一个“可扩展的自动化脚本框架 + 桌面执行器”，而不是一个标准的业务型 Python 项目。开发时更重要的是：
+
+- 任务配置是否准确
+- 模板识别是否稳定
+- ADB 操作是否可靠
+- 程序在设备状态异常时是否能安全停止
+
+如果你是想在这个仓库上继续开发，最值得优先看的几个文件是：
+
+- `main.py`
+- `src/auto_chaldea/__init__.py`
+- `src/auto_chaldea/core/task_executor.py`
+- `src/auto_chaldea/core/task_loader.py`
+- `src/auto_chaldea/utils/recognizer.py`
+- `assets/task/`
+- `assets/template/`
+
+这是本仓库最贴近“真实执行逻辑”的入口，适合用来继续搭建更复杂的任务流和识别策略。
