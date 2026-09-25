@@ -14,7 +14,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from auto_chaldea.ui.icons import pause_icon, play_icon, stop_icon, tasks_icon
+from auto_chaldea.ui.icons import (
+    next_icon,
+    pause_icon,
+    play_icon,
+    stop_icon,
+    tasks_icon,
+)
 from auto_chaldea.ui.theme import GITHUB_DARK
 from auto_chaldea.utils.adb_device import disconnect_device
 from auto_chaldea.core.task_schema import valid_steps
@@ -136,6 +142,12 @@ class TaskDetailView(QWidget):
         self._pause_button.setIcon(pause_icon(GITHUB_DARK["text"]))
         self._pause_button.clicked.connect(self._toggle_pause)
         bar.addWidget(self._pause_button)
+
+        self._next_button = QPushButton("下一步", self)
+        self._next_button.setIcon(next_icon(GITHUB_DARK["text"]))
+        self._next_button.setCursor(Qt.PointingHandCursor)
+        self._next_button.clicked.connect(self._skip_step)
+        bar.addWidget(self._next_button)
 
         self._stop_button = QPushButton("停止", self)
         self._stop_button.setObjectName("stopButton")
@@ -264,6 +276,12 @@ class TaskDetailView(QWidget):
         self._worker.stop()
         self._set_status("正在停止…", GITHUB_DARK["attention"])
 
+    def _skip_step(self):
+        if self._worker is None:
+            return
+        self._worker.skip_step()
+        self._set_status("正在跳过当前步骤…", GITHUB_DARK["attention"])
+
     def _on_step_started(self, position):
         total = self._table.rowCount()
         self._table.selectRow(position)
@@ -276,6 +294,8 @@ class TaskDetailView(QWidget):
     def _on_step_finished(self, position, result):
         if result == "timeout":
             self._table.set_result(position, "超时", GITHUB_DARK["timeout"])
+        elif result == "skipped":
+            self._table.set_result(position, "已跳过", GITHUB_DARK["attention"])
         elif result == "executed":
             self._table.set_result(position, "已执行", GITHUB_DARK["success"])
         else:
@@ -304,6 +324,7 @@ class TaskDetailView(QWidget):
     def _set_running_state(self, running):
         self._run_button.setEnabled(not running)
         self._pause_button.setEnabled(running)
+        self._next_button.setEnabled(running)
         self._stop_button.setEnabled(running)
         if running:
             self._pause_button.setText("暂停")

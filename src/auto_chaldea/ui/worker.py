@@ -7,7 +7,7 @@ from PySide6.QtCore import QThread, Signal
 
 from auto_chaldea.utils.adb_device import DeviceDisconnectedError, connect_to_device
 from auto_chaldea.utils.paths import ADB_PATH, TEMPLATE_DIR
-from auto_chaldea.core.task_executor import TIMEOUT_RESULT, execute_step
+from auto_chaldea.core.task_executor import SKIP_RESULT, TIMEOUT_RESULT, execute_step
 from auto_chaldea.core.task_schema import valid_steps
 
 
@@ -33,6 +33,7 @@ class TaskWorker(QThread):
         self._resume_event = threading.Event()
         self._resume_event.set()
         self._stop_requested = threading.Event()
+        self._skip_requested = threading.Event()
         self._is_paused = False
 
     # ---- 线程控制 ----
@@ -51,6 +52,11 @@ class TaskWorker(QThread):
         self._stop_requested.set()
         self._resume_event.set()  # 唤醒暂停中的线程以便退出
 
+    def skip_step(self):
+        """请求跳过当前正在等待识别的步骤。"""
+        if self.isRunning():
+            self._skip_requested.set()
+
     @property
     def is_paused(self):
         return self._is_paused
@@ -68,7 +74,7 @@ class TaskWorker(QThread):
         deadline = time.monotonic() + seconds
         while True:
             self._wait_while_paused()
-            if self._stop_requested.is_set():
+            if self._stop_requested.is_set() or self._skip_requested.is_set():
                 return
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -97,6 +103,7 @@ class TaskWorker(QThread):
                 for position, step in enumerate(steps):
                     if self._stop_requested.is_set():
                         break
+                    self._skip_requested.clear()
                     self._wait_while_paused()
                     if self._stop_requested.is_set():
                         break
@@ -109,9 +116,12 @@ class TaskWorker(QThread):
                         sleep_fn=self._interruptible_sleep,
                         device=f"127.0.0.1:{self._port}" if self._port else None,
                         should_stop=self._stop_requested.is_set,
+                        should_skip=self._skip_requested.is_set,
                     )
                     if clicked == TIMEOUT_RESULT:
                         result = "timeout"
+                    elif clicked == SKIP_RESULT:
+                        result = "skipped"
                     elif clicked:
                         result = "executed"
                     else:

@@ -17,6 +17,8 @@ RETRY_BACKOFF_FACTOR = 2.0
 DEFAULT_STEP_INTERVAL = 1.0
 # 超时视为已处理，继续下一步。
 TIMEOUT_RESULT = "timeout"
+# 手动跳过当前步骤，继续下一步。
+SKIP_RESULT = "skip"
 
 
 def _step_float(step, key, default):
@@ -33,6 +35,7 @@ def _recognize_with_retry(
     timeout,
     sleep_fn,
     should_stop=None,
+    should_skip=None,
 ):
     """反复识别直到出现匹配；超时返回 None，外部请求停止时返回空列表。
 
@@ -61,6 +64,9 @@ def _recognize_with_retry(
         if should_stop is not None and should_stop():
             print(f"[task] aborted while waiting for {describe}")
             return []
+        if should_skip is not None and should_skip():
+            print(f"[task] skipped while waiting for {describe}")
+            return SKIP_RESULT
         if deadline is not None:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -85,6 +91,7 @@ def execute_step(
     sleep_fn=time.sleep,
     device=None,
     should_stop=None,
+    should_skip=None,
 ):
     """执行一步任务，识别失败时按退避间隔重试。"""
     if not isinstance(step, dict):
@@ -102,8 +109,10 @@ def execute_step(
 
     # 除 template 外全部字段可省略：mode 默认 single，index 默认 0，region 默认全屏
     mode = str(step.get("mode") or "single").strip().lower()
-    if mode not in ("single", "multi"):
-        raise ValueError(f"Invalid mode value: {mode!r}, expected 'single' or 'multi'")
+    if mode not in ("single", "multi", "none"):
+        raise ValueError(
+            f"Invalid mode value: {mode!r}, expected 'single', 'multi' or 'none'"
+        )
 
     region = normalize_region(step.get("region"))
 
@@ -133,6 +142,8 @@ def execute_step(
         )
 
     if str(template_path).strip().casefold() == "center":
+        if mode == "none":
+            raise ValueError("Step with mode 'none' cannot use template 'Center'")
         width, height = get_size(adb_path=adb_path, device=device)
         print(f"[task] step template=Center, click=({width // 2}, {height // 2})")
         result = clicker(width // 2, height // 2)
@@ -169,7 +180,10 @@ def execute_step(
             timeout=timeout,
             sleep_fn=sleep_fn,
             should_stop=should_stop,
+            should_skip=should_skip,
         )
+        if matches == SKIP_RESULT:
+            return SKIP_RESULT
         if matches is None:
             return TIMEOUT_RESULT
         result = False
@@ -180,10 +194,14 @@ def execute_step(
             sleep_fn(step_interval)
         return result
 
-    # single 模式：单个模板，index 默认 0（第一个匹配）
+    # single/none 模式：单个模板，index 默认 0（第一个匹配）
     index = int(step.get("index") or 0)
 
-    print(f"[task] step template={template_path}, index={index}, region={region}")
+    action = "recognize only" if mode == "none" else "click"
+    print(
+        f"[task] step template={template_path}, mode={mode}, action={action}, "
+        f"index={index}, region={region}"
+    )
 
     def _recognize_single():
         found = recognizer(template_path, region=region)
@@ -198,9 +216,16 @@ def execute_step(
         timeout=timeout,
         sleep_fn=sleep_fn,
         should_stop=should_stop,
+        should_skip=should_skip,
     )
+    if matches == SKIP_RESULT:
+        return SKIP_RESULT
     if matches is None:
         return TIMEOUT_RESULT
+    if mode == "none":
+        if step_interval:
+            sleep_fn(step_interval)
+        return True
     result = False
     if len(matches) > index:
         target = matches[index]

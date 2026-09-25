@@ -36,6 +36,10 @@ def stop_icon(color):
     return _font_icon("fa6s.stop", color)
 
 
+def next_icon(color):
+    return _font_icon("fa6s.forward", color)
+
+
 def device_icon(color):
     return _font_icon("fa6s.mobile-screen", color)
 

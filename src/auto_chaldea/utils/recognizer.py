@@ -119,7 +119,7 @@ def find_all_matches(
     adb_path=ADB_PATH,
     template_dir=TEMPLATE_DIR,
     region=None,
-    threshold=0.8,
+    threshold=0.7,
     device=None,
 ):
     """查找模板的全部匹配，并按屏幕位置排序。"""
@@ -140,7 +140,7 @@ def find_all_matches_multi(
     adb_path=ADB_PATH,
     template_dir=TEMPLATE_DIR,
     region=None,
-    threshold=0.8,
+    threshold=0.7,
     device=None,
 ):
     """在同一张截图中匹配多个模板并返回前 N 个结果。"""

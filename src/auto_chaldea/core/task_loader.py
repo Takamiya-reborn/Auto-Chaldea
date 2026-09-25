@@ -18,6 +18,16 @@ def load_task_files(task_dir=None):
     return list(_iter_task_files(base_dir))
 
 
+def load_task_file(task_path):
+    """按需加载单个任务文件，解析失败时返回 None。"""
+    try:
+        with Path(task_path).open("r", encoding="utf-8") as file:
+            task = yaml.safe_load(file)
+    except (OSError, yaml.YAMLError):
+        return None
+    return task if isinstance(task, dict) else None
+
+
 def _iter_task_files(base_dir):
     yaml_files = sorted([*base_dir.rglob("*.yaml"), *base_dir.rglob("*.yml")])
     for yaml_path in yaml_files:
