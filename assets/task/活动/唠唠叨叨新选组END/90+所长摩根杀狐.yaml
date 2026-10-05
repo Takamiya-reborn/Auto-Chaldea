@@ -1,4 +1,4 @@
-task_name: 日常虐菜
+task_name: 90+
 prerequisite: 1号位所长，2号位摩根，三号位杀狐，御主穿CD服
 steps:
   # Start Phase
@@ -30,11 +30,7 @@ steps:
     region: 下
   - template: Center
   - template: 技能池/skill_2
-    region: 下
-    index: 0
-  - template: 角色池/摩根/冬之女王
-  - template: Center
-  - template: 技能池/skill_2
+    index: 1
     region: 下
   - template: 角色池/奥尔加玛丽/1
   - template: Center
@@ -56,6 +52,10 @@ steps:
   - template: 基本/quick
   - template: 基本/arts
   # Turn 3
+  - template: 技能池/skill_2
+    region: 下
+  - template: 角色池/奥尔加玛丽/1
+  - template: Center
   - template: 技能池/skill_1
     region: 左下
   - template: Center

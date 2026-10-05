@@ -33,8 +33,10 @@ class TemplatesPanel(QWidget):
         layout.addLayout(header)
 
         self._list = QListWidget(self)
-        self._list.setSpacing(2)
+        self._list.setSpacing(4)
         self._list.setIconSize(QSize(36, 36))
+        # 视口默认不接收悬停事件，打开后 QSS 的 ::item:hover 才会生效
+        self._list.viewport().setAttribute(Qt.WA_Hover, True)
         layout.addWidget(self._list, 1)
         self.refresh_templates()
 
@@ -50,6 +52,6 @@ class TemplatesPanel(QWidget):
             item = QListWidgetItem(f"{path.stem}\n{size_text}")
             if not image.isNull():
                 item.setIcon(QIcon(str(path)))
-            item.setSizeHint(QSize(0, 48))
+            item.setSizeHint(QSize(0, 52))
             item.setToolTip(str(path))
             self._list.addItem(item)

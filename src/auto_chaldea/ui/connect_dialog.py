@@ -16,7 +16,7 @@ from PySide6.QtWidgets import (
 from auto_chaldea.utils.adb_device import connect_to_device
 from auto_chaldea.utils.paths import ADB_PATH
 from auto_chaldea.ui.icons import device_icon
-from auto_chaldea.ui.theme import GITHUB_DARK
+from auto_chaldea.ui.theme import FGO
 
 
 class ConnectDialog(QDialog):
@@ -32,11 +32,11 @@ class ConnectDialog(QDialog):
         self._port = None
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(28, 28, 28, 24)
-        layout.setSpacing(10)
+        layout.setContentsMargins(32, 32, 32, 28)
+        layout.setSpacing(12)
 
         icon_button = QToolButton(self)
-        icon_button.setIcon(device_icon(GITHUB_DARK["accent"]))
+        icon_button.setIcon(device_icon(FGO["accent"]))
         icon_button.setIconSize(QSize(44, 44))
         icon_button.setFixedSize(56, 56)
         icon_button.setEnabled(False)
@@ -69,7 +69,7 @@ class ConnectDialog(QDialog):
         self._status_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(self._status_label)
         if notice:
-            self._set_status(notice, GITHUB_DARK["attention"])
+            self._set_status(notice, FGO["attention"])
         layout.addSpacing(6)
 
         buttons = QHBoxLayout()
@@ -95,7 +95,7 @@ class ConnectDialog(QDialog):
     def _try_connect(self):
         text = self._port_edit.text().strip()
         if not text:
-            self._set_status("请输入端口号", GITHUB_DARK["attention"])
+            self._set_status("请输入端口号", FGO["attention"])
             return
 
         try:
@@ -104,7 +104,7 @@ class ConnectDialog(QDialog):
             port = 0
         if not 1 <= port <= 65535:
             self._set_status(
-                "端口必须是 1 到 65535 之间的整数", GITHUB_DARK["attention"]
+                "端口必须是 1 到 65535 之间的整数", FGO["attention"]
             )
             return
 
@@ -119,7 +119,7 @@ class ConnectDialog(QDialog):
             Exception
         ) as error:  # noqa: BLE001 - 连接出错不允许卡死对话框，必须可以重试
             message = f"连接出错：{error}"
-            self._set_status(message, GITHUB_DARK["danger"])
+            self._set_status(message, FGO["danger"])
             self._port_edit.setFocus()
             return
         finally:
@@ -132,7 +132,7 @@ class ConnectDialog(QDialog):
             self.accept()
         else:
             message = "连接失败，请确认模拟器已启动并允许 ADB 调试"
-            self._set_status(message, GITHUB_DARK["danger"])
+            self._set_status(message, FGO["danger"])
             self._port_edit.setFocus()
 
     def _set_status(self, text, color=None):

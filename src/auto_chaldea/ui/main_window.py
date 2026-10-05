@@ -38,6 +38,7 @@ class MainWindow(QMainWindow):
         self._device_monitor = None
 
         central = QWidget(self)
+        central.setObjectName("centralCanvas")
         self.setCentralWidget(central)
         layout = QHBoxLayout(central)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -69,6 +70,9 @@ class MainWindow(QMainWindow):
 
         self.activity_bar.set_checked(PANEL_TASKS)
         self.activity_bar.panel_requested.connect(self._show_panel)
+        self.activity_bar.disconnect_requested.connect(
+            self._handle_device_disconnected
+        )
         self.task_panel.task_selected.connect(self.detail_view.set_task)
         self.detail_view.device_disconnected.connect(self._handle_device_disconnected)
 

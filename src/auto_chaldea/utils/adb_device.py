@@ -3,6 +3,7 @@ import subprocess
 import time
 
 from auto_chaldea.utils.paths import ADB_PATH
+from auto_chaldea.utils.process import hidden_window_kwargs
 
 
 class DeviceDisconnectedError(RuntimeError):
@@ -21,6 +22,7 @@ def connect_to_device(port, adb_path=ADB_PATH):
             errors="replace",
             check=False,
             timeout=15,
+            **hidden_window_kwargs(),
         )
     except OSError as error:
         print(f"Failed to run ADB executable {adb_path}: {error}")
@@ -54,6 +56,7 @@ def disconnect_device(port, adb_path=ADB_PATH):
             errors="replace",
             check=False,
             timeout=15,
+            **hidden_window_kwargs(),
         )
     except OSError as error:
         print(f"Failed to run ADB executable {adb_path}: {error}")
@@ -76,7 +79,9 @@ def click(x, y, adb_path=ADB_PATH, device=None):
     """点击设备屏幕坐标。"""
     command = _device_command(adb_path, device, "shell", "input", "tap", int(x), int(y))
     try:
-        result = subprocess.run(command, check=False, timeout=15)
+        result = subprocess.run(
+            command, check=False, timeout=15, **hidden_window_kwargs()
+        )
     except (OSError, subprocess.TimeoutExpired) as error:
         raise DeviceDisconnectedError("无法操作模拟器") from error
     if result.returncode != 0:
@@ -104,6 +109,7 @@ def get_size(adb_path=ADB_PATH, device=None):
             errors="replace",
             check=False,
             timeout=15,
+            **hidden_window_kwargs(),
         )
     except (OSError, subprocess.TimeoutExpired) as error:
         raise DeviceDisconnectedError("无法读取模拟器屏幕尺寸") from error
@@ -145,6 +151,7 @@ def _device_is_online(address, adb_path=ADB_PATH, timeout=15):
             errors="replace",
             check=False,
             timeout=timeout,
+            **hidden_window_kwargs(),
         )
     except (FileNotFoundError, subprocess.TimeoutExpired):
         return False

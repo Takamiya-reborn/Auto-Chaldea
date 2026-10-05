@@ -21,7 +21,7 @@ from auto_chaldea.ui.icons import (
     stop_icon,
     tasks_icon,
 )
-from auto_chaldea.ui.theme import GITHUB_DARK
+from auto_chaldea.ui.theme import FGO
 from auto_chaldea.utils.adb_device import disconnect_device
 from auto_chaldea.core.task_schema import valid_steps
 from auto_chaldea.ui.task_table import TaskStepTable
@@ -63,7 +63,7 @@ class TaskDetailView(QWidget):
         layout.setSpacing(12)
 
         icon_button = QToolButton(page)
-        icon_button.setIcon(tasks_icon(GITHUB_DARK["border_strong"]))
+        icon_button.setIcon(tasks_icon(FGO["border_strong"]))
         icon_button.setIconSize(QSize(56, 56))
         icon_button.setFixedSize(64, 64)
         icon_button.setEnabled(False)
@@ -86,8 +86,8 @@ class TaskDetailView(QWidget):
     def _build_detail_page(self):
         page = QWidget(self)
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(16, 14, 16, 14)
-        layout.setSpacing(10)
+        layout.setContentsMargins(20, 16, 20, 16)
+        layout.setSpacing(12)
 
         self._title_label = QLabel(page)
         self._title_label.setObjectName("detailTitle")
@@ -110,7 +110,7 @@ class TaskDetailView(QWidget):
 
     def _build_action_bar(self):
         bar = QHBoxLayout()
-        bar.setSpacing(8)
+        bar.setSpacing(10)
 
         port_label = QLabel("设备端口")
         port_label.setObjectName("portLabel")
@@ -132,26 +132,26 @@ class TaskDetailView(QWidget):
 
         self._run_button = QPushButton("执行", self)
         self._run_button.setObjectName("runButton")
-        self._run_button.setIcon(play_icon("#ffffff"))
+        self._run_button.setIcon(play_icon(FGO["text_on_cream"]))
         self._run_button.setCursor(Qt.PointingHandCursor)
         self._run_button.clicked.connect(self._start_run)
         bar.addWidget(self._run_button)
 
         self._pause_button = QPushButton("暂停", self)
         self._pause_button.setCursor(Qt.PointingHandCursor)
-        self._pause_button.setIcon(pause_icon(GITHUB_DARK["text"]))
+        self._pause_button.setIcon(pause_icon(FGO["text_on_cream"]))
         self._pause_button.clicked.connect(self._toggle_pause)
         bar.addWidget(self._pause_button)
 
         self._next_button = QPushButton("下一步", self)
-        self._next_button.setIcon(next_icon(GITHUB_DARK["text"]))
+        self._next_button.setIcon(next_icon(FGO["text_on_cream"]))
         self._next_button.setCursor(Qt.PointingHandCursor)
         self._next_button.clicked.connect(self._skip_step)
         bar.addWidget(self._next_button)
 
         self._stop_button = QPushButton("停止", self)
         self._stop_button.setObjectName("stopButton")
-        self._stop_button.setIcon(stop_icon(GITHUB_DARK["danger"]))
+        self._stop_button.setIcon(stop_icon("#f5e9e9"))
         self._stop_button.setCursor(Qt.PointingHandCursor)
         self._stop_button.clicked.connect(self._stop_run)
         bar.addWidget(self._stop_button)
@@ -200,7 +200,7 @@ class TaskDetailView(QWidget):
     def set_device_port(self, port):
         """记录启动时已连接的设备端口并更新状态提示。"""
         self._port_edit.setText(str(port))
-        self._set_status(f"已连接 127.0.0.1:{port}", GITHUB_DARK["success"])
+        self._set_status(f"已连接 127.0.0.1:{port}", FGO["success"])
 
     # ---- 任务执行 ----
 
@@ -210,7 +210,7 @@ class TaskDetailView(QWidget):
 
         steps = valid_steps(self._task)
         if not steps:
-            self._set_status("任务没有可执行的步骤", GITHUB_DARK["attention"])
+            self._set_status("任务没有可执行的步骤", FGO["attention"])
             return
 
         execution_total, accepted = QInputDialog.getInt(
@@ -234,7 +234,7 @@ class TaskDetailView(QWidget):
             if not 1 <= port_value <= 65535:
                 self._set_status(
                     "设备端口必须是 1 到 65535 之间的整数",
-                    GITHUB_DARK["attention"],
+                    FGO["attention"],
                 )
                 return
 
@@ -247,13 +247,13 @@ class TaskDetailView(QWidget):
         self._worker.step_finished.connect(self._on_step_finished)
         self._worker.device_disconnected.connect(self._on_device_disconnected)
         self._worker.log_message.connect(
-            lambda message: self._set_status(message, GITHUB_DARK["muted"])
+            lambda message: self._set_status(message, FGO["muted"])
         )
         self._worker.finished_run.connect(self._on_finished)
         self._worker.start()
 
         self._set_running_state(running=True)
-        self._set_status(f"运行中 · 共 {len(steps)} 个步骤", GITHUB_DARK["accent"])
+        self._set_status(f"运行中 · 共 {len(steps)} 个步骤", FGO["accent"])
 
     def _toggle_pause(self):
         worker = self._worker
@@ -262,44 +262,47 @@ class TaskDetailView(QWidget):
         if worker.is_paused:
             worker.resume()
             self._pause_button.setText("暂停")
-            self._pause_button.setIcon(pause_icon(GITHUB_DARK["text"]))
-            self._set_status("运行中", GITHUB_DARK["accent"])
+            self._pause_button.setIcon(pause_icon(FGO["text_on_cream"]))
+            self._set_status("运行中", FGO["accent"])
         else:
             worker.pause()
             self._pause_button.setText("继续")
-            self._pause_button.setIcon(play_icon(GITHUB_DARK["text"]))
-            self._set_status("已暂停", GITHUB_DARK["attention"])
+            self._pause_button.setIcon(play_icon(FGO["text_on_cream"]))
+            self._set_status("已暂停", FGO["attention"])
 
     def _stop_run(self):
         if self._worker is None:
             return
         self._worker.stop()
-        self._set_status("正在停止…", GITHUB_DARK["attention"])
+        self._set_status("正在停止…", FGO["attention"])
 
     def _skip_step(self):
         if self._worker is None:
             return
         self._worker.skip_step()
-        self._set_status("正在跳过当前步骤…", GITHUB_DARK["attention"])
+        self._set_status("正在跳过当前步骤…", FGO["attention"])
 
     def _on_step_started(self, position):
         total = self._table.rowCount()
-        self._table.selectRow(position)
-        self._set_status(f"运行中 · 步骤 {position + 1}/{total}", GITHUB_DARK["accent"])
+        self._table.set_running_row(position)
+        self._table.set_result(position, "运行中", FGO["gold_deep"])
+        self._set_status(f"运行中 · 步骤 {position + 1}/{total}", FGO["accent"])
 
     def _on_execution_started(self, execution):
+        # 每一轮开始前清空上一轮的结果，避免多次执行时旧状态覆盖堆积
         self._execution_current = execution
-        self._set_status("运行中", GITHUB_DARK["accent"])
+        self._table.clear_results()
+        self._set_status("运行中", FGO["accent"])
 
     def _on_step_finished(self, position, result):
         if result == "timeout":
-            self._table.set_result(position, "超时", GITHUB_DARK["timeout"])
+            self._table.set_result(position, "超时", FGO["timeout"])
         elif result == "skipped":
-            self._table.set_result(position, "已跳过", GITHUB_DARK["attention"])
+            self._table.set_result(position, "已跳过", FGO["attention"])
         elif result == "executed":
-            self._table.set_result(position, "已执行", GITHUB_DARK["success"])
+            self._table.set_result(position, "已执行", FGO["success"])
         else:
-            self._table.set_result(position, "未匹配", GITHUB_DARK["danger"])
+            self._table.set_result(position, "未匹配", FGO["danger"])
 
     def _on_device_disconnected(self):
         port = self._port_edit.text().strip()
@@ -313,11 +316,12 @@ class TaskDetailView(QWidget):
             self._worker = None
 
         self._set_running_state(running=False)
+        self._table.clear_running_row()
         if completed:
-            self._set_status("已完成", GITHUB_DARK["success"])
+            self._set_status("已完成", FGO["success"])
         else:
             self._table.clear_results()
-            self._set_status("已停止", GITHUB_DARK["danger"])
+            self._set_status("已停止", FGO["danger"])
 
     # ---- 状态与按钮 ----
 
@@ -328,14 +332,12 @@ class TaskDetailView(QWidget):
         self._stop_button.setEnabled(running)
         if running:
             self._pause_button.setText("暂停")
-            self._pause_button.setIcon(pause_icon(GITHUB_DARK["text"]))
+            self._pause_button.setIcon(pause_icon(FGO["text_on_cream"]))
         self._port_edit.setEnabled(not running)
 
     def _set_status(self, text, color=None):
         if self._execution_total:
-            text = (
-                f"当前执行：{self._execution_current}/{self._execution_total} · {text}"
-            )
+            text = f"第 {self._execution_current}/{self._execution_total} 轮 · {text}"
         if color:
             self._status_label.setText(f'<span style="color:{color};">●</span> {text}')
         else:

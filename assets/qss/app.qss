@@ -1,130 +1,203 @@
+/* ==== Auto-Chaldea · FGO 游戏风主题 ==== */
+
+/* ==== 字体与基底 ==== */
 * {
-    font-family: "Segoe UI", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+    font-family: "Microsoft YaHei UI", "PingFang SC", sans-serif;
     font-size: 13px;
 }
 
-QWidget { color: #e6edf3; }
-QMainWindow { background-color: #0d1117; }
-
-QToolTip {
-    background-color: #161b22;
-    color: #e6edf3;
-    border: 1px solid #30363d;
-    padding: 4px 8px;
+QWidget { color: #e8e6df; }
+QMainWindow {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #1b3048, stop:0.55 #142438, stop:1 #0f1b2a);
+}
+QWidget#centralCanvas {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #1b3048, stop:0.55 #142438, stop:1 #0f1b2a);
 }
 
+/* ==== 提示气泡 ==== */
+QToolTip {
+    background-color: #10233a;
+    color: #e8e6df;
+    border: 1px solid #b89a5e;
+    padding: 2px 6px;
+    font-size: 11px;
+}
+
+/* ==== 活动栏 ==== */
 #activityBar {
-    background-color: #161b22;
-    border-right: 1px solid #21262d;
+    background-color: #1a3049;
+    border-right: 1px solid #0e1a28;
 }
 QToolButton#activityButton {
     background: transparent;
     border: none;
-    border-left: 2px solid transparent;
-    border-top-right-radius: 6px;
-    border-bottom-right-radius: 6px;
-    padding: 0 11px;
+    border-left: 3px solid transparent;
+    border-top-right-radius: 8px;
+    border-bottom-right-radius: 8px;
+    padding: 0 6px;
 }
-QToolButton#activityButton:hover { background-color: #1c2128; }
-QToolButton#activityButton:checked { border-left: 2px solid #f78166; }
+QToolButton#activityButton:hover { background-color: rgba(35, 64, 92, 0.7); }
+QToolButton#activityButton:checked { border-left: 3px solid #d4b06a; }
 
+/* ==== 侧栏面板 ==== */
 #sidePanel {
-    background-color: #161b22;
-    border-right: 1px solid #21262d;
+    background-color: #1a3049;
+    border-right: 1px solid #0e1a28;
 }
-QLabel#panelHeader { color: #8b949e; font-size: 11px; font-weight: 700; }
+QLabel#panelHeader {
+    color: #d4b06a;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 2px;
+}
 QToolButton#panelHeaderButton {
     background: transparent;
     border: none;
     border-radius: 6px;
     padding: 4px;
 }
-QToolButton#panelHeaderButton:hover { background-color: #1c2128; }
+QToolButton#panelHeaderButton:hover { background-color: rgba(35, 64, 92, 0.7); }
 
+/* ==== 列表与树（FGO 奶油卡片风）==== */
 QListWidget, QTreeWidget { background: transparent; border: none; outline: none; }
-QListWidget::item, QTreeWidget::item { padding: 6px 8px; border-radius: 6px; }
-QListWidget::item:hover, QTreeWidget::item:hover { background-color: #1c2128; }
-QListWidget::item:selected, QTreeWidget::item:selected { background-color: #2d333b; }
-QTreeWidget::branch { background: transparent; image: none; }
-QTreeWidget { font-size: 12px; }
-QTreeWidget::item:hover { background-color: transparent; }
-QTreeWidget::item:selected, QTreeWidget::item:selected:hover { background-color: #2d333b; }
-QTreeWidget::branch:hover, QTreeWidget::branch:selected { background-color: transparent; }
-
-QLabel#detailTitle { font-size: 17px; font-weight: 600; }
-QLabel#detailMeta, QLabel#statusLabel, QLabel#portLabel { color: #8b949e; font-size: 12px; }
-QLabel#detailDesc { color: #e6edf3; }
-QLabel#emptyHint { color: #8b949e; font-size: 22px; font-weight: 600; }
-QLabel#emptySubHint { color: #8b949e; font-size: 13px; }
-
-QTableWidget {
-    background-color: #0d1117;
-    border: 1px solid #21262d;
+/* 任务树的奶油卡片背景由 TaskTreeWidget.drawRow 整行自绘，不走 QSS */
+QListWidget::item {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #f7f2e4, stop:1 #eee5cd);
+    border: 1px solid #b89a5e;
     border-radius: 6px;
-    gridline-color: #21262d;
-    selection-background-color: #2d333b;
-    selection-color: #e6edf3;
+    padding: 6px 8px;
+    color: #2a3240;
+}
+QListWidget::item:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #fdfaf0, stop:1 #f4ecd8);
+    border-color: #c9a75f;
+}
+QListWidget::item:selected {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #fffdf4, stop:1 #f6edd6);
+    border: 2px solid #d4b06a;
+    padding: 5px 7px;
+    color: #2a3240;
+}
+QTreeWidget::branch { background: transparent; image: none; }
+QTreeWidget { font-size: 12px; color: #2a3240; }
+
+/* ==== 详情区 ==== */
+QLabel#detailTitle { font-size: 18px; font-weight: 800; }
+QLabel#detailMeta, QLabel#statusLabel, QLabel#portLabel { color: #9aa7b5; font-size: 12px; }
+QLabel#detailDesc { color: #e8e6df; }
+QLabel#emptyHint { color: #9aa7b5; font-size: 22px; font-weight: 600; }
+QLabel#emptySubHint { color: #9aa7b5; font-size: 13px; }
+
+/* ==== 表格（奶油底，仿 FGO 列表）==== */
+QTableWidget {
+    background-color: #f7f2e4;
+    alternate-background-color: #efe7d2;
+    color: #2a3240;
+    border: 1px solid #b89a5e;
+    border-radius: 6px;
+    gridline-color: #ddd2b8;
+    selection-background-color: #f6edd6;
+    selection-color: #2a3240;
     outline: none;
 }
 QTableWidget::item { padding: 4px 8px; border: none; }
 QHeaderView::section {
-    background-color: #161b22;
-    color: #8b949e;
+    background-color: #23405c;
+    color: #d4b06a;
     border: none;
-    border-bottom: 1px solid #30363d;
-    border-right: 1px solid #21262d;
-    padding: 6px 8px;
-    font-weight: 600;
+    border-bottom: 2px solid #b89a5e;
+    border-right: 1px solid #0e1a28;
+    padding: 7px 8px;
+    font-weight: 700;
 }
 
-#actionBar { background-color: #0d1117; border-top: 1px solid #21262d; }
+/* ==== 操作栏与输入框 ==== */
+#actionBar { background-color: transparent; border-top: 1px solid #0e1a28; }
 QLineEdit {
-    background-color: #0d1117;
-    color: #e6edf3;
-    border: 1px solid #30363d;
+    background-color: #10233a;
+    color: #e8e6df;
+    border: 1px solid #3d5570;
     border-radius: 6px;
-    padding: 5px 8px;
-    selection-background-color: #1f6feb;
+    padding: 6px 10px;
+    selection-background-color: #b8935a;
 }
-QLineEdit:focus { border-color: #58a6ff; }
+QLineEdit:focus { border: 1px solid #d4b06a; }
 
+/* ==== 按钮（奶油底 + 金铜描边，FGO 菜单按钮风）==== */
 QPushButton {
-    background-color: #161b22;
-    color: #e6edf3;
-    border: 1px solid #30363d;
-    border-radius: 6px;
-    padding: 5px 14px;
-}
-QPushButton:hover { background-color: #1c2128; border-color: #3d444d; }
-QPushButton:pressed { background-color: #21262d; }
-QPushButton:disabled { color: #8b949e; background-color: #161b22; border-color: #21262d; }
-QPushButton#runButton {
-    background-color: #238636;
-    border: 1px solid rgba(240, 246, 252, 0.1);
-    color: #ffffff;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #faf6ea, stop:1 #e8dfc8);
+    color: #2a3240;
     font-weight: 600;
+    border: 2px solid #b89a5e;
+    border-radius: 6px;
     padding: 6px 18px;
 }
-QPushButton#runButton:hover { background-color: #2ea043; }
-QPushButton#runButton:disabled {
-    background-color: rgba(46, 160, 67, 0.35);
-    border-color: rgba(240, 246, 252, 0.05);
-    color: rgba(255, 255, 255, 0.75);
+QPushButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #fffdf4, stop:1 #efe6cf);
+    border-color: #d4b06a;
 }
-QPushButton#stopButton { background: transparent; color: #f85149; border: 1px solid #30363d; }
-QPushButton#stopButton:hover { background-color: rgba(248, 81, 73, 0.1); border-color: #f85149; }
-QPushButton#stopButton:disabled { color: #8b949e; }
+QPushButton:pressed { background: #ddd2b4; border-color: #8a6f3c; }
+QPushButton:disabled {
+    background: #6b7d90;
+    color: #3d4d5e;
+    border-color: #4d5c6b;
+}
+QPushButton#runButton {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #e8c97e, stop:1 #c99b3f);
+    color: #2a3240;
+    font-weight: 700;
+    border: 2px solid #8a6f3c;
+    padding: 7px 22px;
+}
+QPushButton#runButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #f2d894, stop:1 #c99b3f);
+    border-color: #b8935a;
+}
+QPushButton#runButton:pressed { background: #b3873a; border-color: #8a6f3c; }
+QPushButton#runButton:disabled {
+    background: rgba(201, 155, 63, 0.4);
+    color: rgba(42, 50, 64, 0.6);
+    border-color: rgba(138, 111, 60, 0.4);
+}
+QPushButton#stopButton {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #a63a3a, stop:1 #7c2430);
+    color: #f5e9e9;
+    font-weight: 600;
+    border: 2px solid #6b1e2a;
+}
+QPushButton#stopButton:hover {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #b84848, stop:1 #7c2430);
+    border-color: #a63a3a;
+}
+QPushButton#stopButton:pressed { background: #6b1e2a; }
+QPushButton#stopButton:disabled {
+    background: rgba(124, 36, 48, 0.35);
+    color: rgba(245, 233, 233, 0.5);
+    border-color: rgba(107, 30, 42, 0.4);
+}
 
-QSplitter::handle { background-color: #21262d; }
-QSplitter::handle:hover { background-color: #58a6ff; }
+/* ==== 滚动条 / 分割线 ==== */
+QSplitter::handle { background-color: #0e1a28; }
+QSplitter::handle:hover { background-color: #d4b06a; }
 QStackedWidget { background: transparent; }
 QScrollBar:vertical { background: transparent; width: 10px; margin: 0; }
-QScrollBar::handle:vertical { background-color: #3d444d; border-radius: 5px; min-height: 24px; margin: 2px 3px; }
-QScrollBar::handle:vertical:hover { background-color: #8b949e; }
+QScrollBar::handle:vertical { background-color: #4d647f; border-radius: 5px; min-height: 24px; margin: 2px 3px; }
+QScrollBar::handle:vertical:hover { background-color: #d4b06a; }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
 QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
 QScrollBar:horizontal { background: transparent; height: 10px; margin: 0; }
-QScrollBar::handle:horizontal { background-color: #3d444d; border-radius: 5px; min-width: 24px; margin: 3px 2px; }
-QScrollBar::handle:horizontal:hover { background-color: #8b949e; }
+QScrollBar::handle:horizontal { background-color: #4d647f; border-radius: 5px; min-width: 24px; margin: 3px 2px; }
+QScrollBar::handle:horizontal:hover { background-color: #d4b06a; }
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
 QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }

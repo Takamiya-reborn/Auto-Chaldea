@@ -5,6 +5,7 @@ from pathlib import Path
 
 from auto_chaldea.utils.adb_device import DeviceDisconnectedError
 from auto_chaldea.utils.paths import ADB_PATH, TEMPLATE_DIR
+from auto_chaldea.utils.process import hidden_window_kwargs
 
 DEFAULT_TEMPLATE_SUFFIX = ".png"
 
@@ -29,7 +30,9 @@ def _capture_screen(adb_path, region, device=None):
         cmd += ["-s", str(device)]
     cmd += ["exec-out", "screencap", "-p"]
     try:
-        res = subprocess.run(cmd, capture_output=True, timeout=15)
+        res = subprocess.run(
+            cmd, capture_output=True, timeout=15, **hidden_window_kwargs()
+        )
     except (OSError, subprocess.TimeoutExpired) as error:
         raise DeviceDisconnectedError("无法读取模拟器屏幕") from error
     if res.returncode != 0:

@@ -2,11 +2,13 @@ task_name: 水所长VII 100 ★★★
 prerequisite: 1t，1号位自出3灵基所长，2号位奥伯龙，三号位助战1、2灵基所长，御主穿战斗服，会开决战强化
 steps:
   # Start Phase
-  - template: 助战/奥尔加玛丽
+  - template: 助战池/奥尔加玛丽
   - template: 基本/开始任务
     timeout: 2
     step_interval: 5
   # Trun 1
+  - template: 技能池/skill_2
+    mode: none
   - template: 基本/御主技能
     region: 右
   - template: 技能池/skill_5
@@ -28,13 +30,13 @@ steps:
   - template: 技能池/skill_2
     index: 0
     region: 左下
-  - template: 角色池/奥尔加玛丽/1
+  - template: 角色池/奥尔加玛丽/2
     region: 右
   - template: Center
   - template: 技能池/skill_3
     index: 0
     region: 下
-  - template: 角色池/奥尔加玛丽/1
+  - template: 角色池/奥尔加玛丽/2
   - template: Center
   - template: 技能池/skill_3
     region: 下
@@ -59,3 +61,4 @@ steps:
   - template: 基本/下一步
     region: 右下
   - template: 基本/连续出击
+    timeout: 3

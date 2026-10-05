@@ -86,6 +86,7 @@ Auto-Chaldea 是一个基于 ADB、OpenCV 和 PySide6 的 FGO 自动化辅助工
 │   └── template/
 ├── scripts/
 │   ├── scap.py              # 开发用截图脚本，生成模板或校验画面
+│   ├── check.py             # 检查屏幕与模板的最高匹配度
 │   └── ...                  # 其它开发辅助脚本
 └── uv.lock
 ```
@@ -122,6 +123,18 @@ uv run scripts/scap.py [port]
 
 功能是截图并放置在`assets/template/`
 如果本机只有一个 ADB 设备，可省略端口；如果有多个设备，请显式指定端口来区分。
+
+检查当前屏幕与指定模板图像的最高矩阵匹配度：
+
+```powershell
+uv run scripts/check.py "Path to template image"
+```
+
+脚本会截取一次当前屏幕，使用 OpenCV `TM_CCOEFF_NORMED` 在指定模板图像中查找最高匹配度，并输出匹配度及最佳匹配位置。默认要求只有一个在线 ADB 设备；多设备时可使用序列号明确指定：
+
+```powershell
+uv run scripts/check.py "Path to template image" --device SERIAL
+```
 
 ### 设置任务执行次数
 

@@ -19,7 +19,7 @@ def main():
     while True:
         dialog = ConnectDialog(
             initial_port=reconnect_port,
-            notice="模拟器已断开，请重新连接" if reconnect_port else None,
+            notice="设备已断开，请重新连接" if reconnect_port else None,
         )
         if dialog.exec() != ConnectDialog.Accepted:
             return 0

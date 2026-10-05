@@ -6,6 +6,7 @@ import subprocess
 from PySide6.QtCore import QThread, Signal
 
 from auto_chaldea.utils.paths import ADB_PATH
+from auto_chaldea.utils.process import hidden_window_kwargs
 
 
 class DeviceMonitor(QThread):
@@ -36,6 +37,7 @@ class DeviceMonitor(QThread):
                 command,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.DEVNULL,
+                **hidden_window_kwargs(),
             )
         except OSError:
             if not self._stop_requested.is_set():
