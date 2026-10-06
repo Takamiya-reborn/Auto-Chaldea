@@ -30,13 +30,17 @@ steps:
   - template: 技能池/skill_2
     index: 0
     region: 左下
-  - template: 角色池/奥尔加玛丽/2
+  - template: 角色池/奥尔加玛丽/1,角色池/奥尔加玛丽/2
     region: 右
+    mode: multi
+    count: 1
   - template: Center
   - template: 技能池/skill_3
     index: 0
     region: 下
-  - template: 角色池/奥尔加玛丽/2
+  - template: 角色池/奥尔加玛丽/1,角色池/奥尔加玛丽/2
+    mode: multi
+    count: 1
   - template: Center
   - template: 技能池/skill_3
     region: 下

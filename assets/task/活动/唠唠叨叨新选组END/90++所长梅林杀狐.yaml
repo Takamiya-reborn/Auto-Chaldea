@@ -1,0 +1,75 @@
+task_name: 90++
+prerequisite: 所长1号位，杀狐、梅林2、3号位，穿CD服，注意所长带活动倍卡，或者芙尔摩斯等高攻击礼装
+steps:
+  # Start Phase
+  - template: 助战池/选助战
+    region: 右
+  - template: 基本/开始任务
+    region: 右下
+    timeout: 3
+  # Trun 1
+  - template: 技能池/skill_2
+    region: 下
+  - template: Center
+  - template: 技能池/skill_3
+    index: 1
+    region: 下
+  - template: 角色池/奥尔加玛丽/1
+  - template: Center
+  - template: 基本/attack
+    region: 右下
+  - template: 宝具/既已过去的人理之终
+  - template: 基本/buster,基本/arts,基本/quick
+    mode: multi
+    count: 2
+  # Trun 2
+  - template: 技能池/skill_1
+  - template: Center
+  - template: 技能池/skill_8
+  - template: Center
+  - template: 技能池/skill_5
+  - template: Center
+  - template: 技能池/skill_3
+    index: 1
+    region: 下
+  - template: Center
+  - template: 技能池/skill_4
+  - template: 角色池/奥尔加玛丽/1
+  - template: Center
+  - template: 技能池/skill_2
+  - template: 角色池/奥尔加玛丽/1
+  - template: Center
+  - template: 技能池/skill_3
+    index: 1
+  - template: 角色池/奥尔加玛丽/1
+  - template: Center
+  - template: 基本/御主技能
+    region: 右
+  - template: 技能池/skill_1
+  - template: 角色池/奥尔加玛丽/1
+  - template: Center
+  - template: 技能池/skill_2
+  - template: Center
+  - template: 基本/attack
+    region: 右下
+  - template: 宝具/既已过去的人理之终
+  - template: 基本/quick
+  - template: 基本/arts
+  # Turn 3
+  - template: 技能池/skill_1
+  - template: Center
+  - template: 基本/attack
+    region: 右下
+  - template: 宝具/既已过去的人理之终
+  - template: 基本/buster
+    mode: multi
+    count: 2
+  # End Phase
+  - template: 基本/请点击游戏界面
+    region: 下
+  - template: 基本/请点击游戏界面
+    region: 下
+  - template: 基本/下一步
+    region: 右下
+  - template: 基本/连续出击
+    timeout: 3

@@ -88,6 +88,8 @@ QTreeWidget { font-size: 12px; color: #2a3240; }
 
 /* ==== 详情区 ==== */
 QLabel#detailTitle { font-size: 18px; font-weight: 800; }
+QLabel#previewName { color: #e8e6df; font-size: 14px; font-weight: 700; }
+QLabel#previewInfo { color: #9aa7b5; font-size: 12px; }
 QLabel#detailMeta, QLabel#statusLabel, QLabel#portLabel { color: #9aa7b5; font-size: 12px; }
 QLabel#detailDesc { color: #e8e6df; }
 QLabel#emptyHint { color: #9aa7b5; font-size: 22px; font-weight: 600; }

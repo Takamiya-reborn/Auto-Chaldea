@@ -4,6 +4,7 @@ from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QMainWindow,
+    QMessageBox,
     QSplitter,
     QStackedWidget,
     QWidget,
@@ -14,7 +15,7 @@ from auto_chaldea.ui.device_monitor import DeviceMonitor
 from auto_chaldea.ui.task_detail import TaskDetailView
 from auto_chaldea.ui.task_panel import TaskPanel
 from auto_chaldea.ui.settings_panel import SettingsPanel
-from auto_chaldea.ui.templates_panel import TemplatesPanel
+from auto_chaldea.ui.templates_panel import TemplateDetailView, TemplatesPanel
 
 PANEL_TASKS = 0
 PANEL_TEMPLATES = 1
@@ -55,10 +56,20 @@ class MainWindow(QMainWindow):
         self._panel_stack.addWidget(self.settings_panel)
 
         self.detail_view = TaskDetailView(self)
+        self.template_view = TemplateDetailView(self)
+        # 详情区在任务详情与模板放大图之间切换，占据同一位置
+        self._detail_stack = QStackedWidget(self)
+        self._detail_stack.addWidget(self.detail_view)
+        self._detail_stack.addWidget(self.template_view)
+        # 活动面板 -> 详情区视图的映射；写设置面板时在此注册
+        self._detail_by_panel = {
+            PANEL_TASKS: self.detail_view,
+            PANEL_TEMPLATES: self.template_view,
+        }
 
         splitter = QSplitter(Qt.Horizontal, self)
         splitter.addWidget(self._panel_stack)
-        splitter.addWidget(self.detail_view)
+        splitter.addWidget(self._detail_stack)
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
         splitter.setCollapsible(0, False)
@@ -70,10 +81,9 @@ class MainWindow(QMainWindow):
 
         self.activity_bar.set_checked(PANEL_TASKS)
         self.activity_bar.panel_requested.connect(self._show_panel)
-        self.activity_bar.disconnect_requested.connect(
-            self._handle_device_disconnected
-        )
-        self.task_panel.task_selected.connect(self.detail_view.set_task)
+        self.activity_bar.disconnect_requested.connect(self._confirm_disconnect)
+        self.task_panel.task_selected.connect(self._show_task)
+        self.templates_panel.template_selected.connect(self._show_template)
         self.detail_view.device_disconnected.connect(self._handle_device_disconnected)
 
         if device_port is not None:
@@ -95,6 +105,30 @@ class MainWindow(QMainWindow):
         self._panel_index = index
         self._panel_stack.setCurrentIndex(index)
         self.activity_bar.set_checked(index)
+        # 详情区跟随活动面板切换；新增面板时在 _detail_by_panel 注册对应视图
+        self._detail_stack.setCurrentWidget(
+            self._detail_by_panel.get(index, self.detail_view)
+        )
+
+    def _show_task(self, task):
+        """选择任务时刷新任务详情内容。"""
+        self.detail_view.set_task(task)
+
+    def _show_template(self, path):
+        """选择模板时刷新模板放大图；取消选择则显示空状态。"""
+        self.template_view.set_template(path)
+
+    def _confirm_disconnect(self):
+        """手动断开设备前进行二次确认。"""
+        answer = QMessageBox.question(
+            self,
+            "断开设备",
+            f"确定要断开当前设备（端口 {self._device_port}）吗？",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if answer == QMessageBox.Yes:
+            self._handle_device_disconnected()
 
     def _handle_device_disconnected(self, _port=None):
         """统一处理主动监控和任务执行中发现的设备断开。"""

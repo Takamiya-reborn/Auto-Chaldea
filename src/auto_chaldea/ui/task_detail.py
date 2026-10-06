@@ -162,7 +162,12 @@ class TaskDetailView(QWidget):
     # ---- 公开接口 ----
 
     def set_task(self, task, filename=""):
-        """切换当前展示的任务；task 为 None 时回到空状态。"""
+        """切换当前展示的任务；task 为 None 时回到空状态。
+
+        切换（含列表刷新导致的重新选中）前先终止仍在执行的后台线程，
+        否则旧任务会继续占用设备，其步骤信号还会写进新任务的表格。
+        """
+        self._cancel_running_worker()
         self._task = task
         self._filename = filename
         self._execution_total = 0
@@ -203,6 +208,31 @@ class TaskDetailView(QWidget):
         self._set_status(f"已连接 127.0.0.1:{port}", FGO["success"])
 
     # ---- 任务执行 ----
+
+    def _cancel_running_worker(self):
+        """终止仍在执行的后台线程并把界面复位到非运行态。
+
+        先断开该 worker 的全部信号再停止，避免排队中的步骤事件在
+        线程结束后仍投递到已切换的新表格上。
+        """
+        worker = self._worker
+        if worker is None:
+            return
+        for signal in (
+            worker.execution_started,
+            worker.step_started,
+            worker.step_finished,
+            worker.device_disconnected,
+            worker.log_message,
+            worker.finished_run,
+        ):
+            signal.disconnect()
+        worker.stop()
+        worker.wait()
+        worker.deleteLater()
+        self._worker = None
+        self._set_running_state(running=False)
+        self._table.clear_running_row()
 
     def _start_run(self):
         if self._worker is not None or self._task is None:
