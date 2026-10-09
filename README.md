@@ -115,6 +115,10 @@ uv run auto-chaldea
 .\scripts\nuitka.ps1
 ```
 
+打包版本默认不显示控制台。如果启动失败，会在 exe 同目录生成
+`startup-error.log`，同时弹出错误详情窗口；请根据该文件排查缺少的资源或
+运行库问题。
+
 ### 开发期间的辅助脚本
 
 ```powershell
