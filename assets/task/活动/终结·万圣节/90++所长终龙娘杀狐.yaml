@@ -1,5 +1,5 @@
 task_name: 90++
-prerequisite: 1号位所长，2号位仇龙娘，御主穿CD服
+prerequisite: 1号位所长，2号位，3号位杀狐仇龙娘，御主穿CD服
 steps:
   # Start Phase
   - template: 助战池/选助战
@@ -41,6 +41,7 @@ steps:
   - template: 技能池/skill_1
   - template: Center
   - template: 技能池/skill_2
+    region: 右
   - template: 角色池/奥尔加玛丽/1
   - template: Center
   - template: 基本/attack
