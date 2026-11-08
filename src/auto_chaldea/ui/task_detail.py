@@ -23,6 +23,7 @@ from auto_chaldea.ui.icons import (
 )
 from auto_chaldea.ui.theme import FGO
 from auto_chaldea.utils.adb_device import disconnect_device
+from auto_chaldea.core.task_executor import expand_named_steps
 from auto_chaldea.core.task_schema import valid_steps
 from auto_chaldea.ui.task_table import TaskStepTable
 from auto_chaldea.ui.worker import TaskWorker
@@ -178,7 +179,8 @@ class TaskDetailView(QWidget):
             return
 
         name = task.get("task_name") or task.get("name") or "未命名任务"
-        steps = valid_steps(task)
+        # 展开命名坐标点拆分出的步骤，保证表格行数与运行时步骤一一对应
+        steps = expand_named_steps(valid_steps(task))
         self._title_label.setText(name)
         self._meta_label.setText(f"来源 {filename}.yaml · 共 {len(steps)} 个步骤")
 
@@ -238,7 +240,7 @@ class TaskDetailView(QWidget):
         if self._worker is not None or self._task is None:
             return
 
-        steps = valid_steps(self._task)
+        steps = expand_named_steps(valid_steps(self._task))
         if not steps:
             self._set_status("任务没有可执行的步骤", FGO["attention"])
             return

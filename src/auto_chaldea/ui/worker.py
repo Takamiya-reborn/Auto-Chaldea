@@ -7,7 +7,12 @@ from PySide6.QtCore import QThread, Signal
 
 from auto_chaldea.utils.adb_device import DeviceDisconnectedError, connect_to_device
 from auto_chaldea.utils.paths import ADB_PATH, TEMPLATE_DIR
-from auto_chaldea.core.task_executor import SKIP_RESULT, TIMEOUT_RESULT, execute_step
+from auto_chaldea.core.task_executor import (
+    SKIP_RESULT,
+    TIMEOUT_RESULT,
+    execute_step,
+    resolve_steps,
+)
 from auto_chaldea.core.task_schema import valid_steps
 
 
@@ -95,6 +100,9 @@ class TaskWorker(QThread):
                 self.log_message.emit("设备连接成功。")
 
             steps = valid_steps(self._task)
+            device = f"127.0.0.1:{self._port}" if self._port else None
+            # 设备连接成功后再解析：命名坐标点（Center、Enemy1 等）需要屏幕尺寸换算
+            steps = resolve_steps(steps, adb_path=ADB_PATH, device=device)
             completed = True
             for execution in range(1, self._execution_total + 1):
                 if self._stop_requested.is_set():
@@ -114,7 +122,7 @@ class TaskWorker(QThread):
                         adb_path=ADB_PATH,
                         template_dir=TEMPLATE_DIR,
                         sleep_fn=self._interruptible_sleep,
-                        device=f"127.0.0.1:{self._port}" if self._port else None,
+                        device=device,
                         should_stop=self._stop_requested.is_set,
                         should_skip=self._skip_requested.is_set,
                     )

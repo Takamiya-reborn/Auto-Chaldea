@@ -6,7 +6,12 @@ from auto_chaldea.utils.paths import (
     TASK_DIR,
     TEMPLATE_DIR,
 )
-from auto_chaldea.core.task_executor import execute_step, execute_task
+from auto_chaldea.core.task_executor import (
+    execute_step,
+    execute_task,
+    expand_named_steps,
+    resolve_steps,
+)
 from auto_chaldea.core.task_loader import load_tasks
 
 
@@ -27,5 +32,7 @@ __all__ = [
     "load_tasks",
     "execute_step",
     "execute_task",
+    "expand_named_steps",
+    "resolve_steps",
     "main",
 ]

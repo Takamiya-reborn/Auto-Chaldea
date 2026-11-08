@@ -20,6 +20,108 @@ TIMEOUT_RESULT = "timeout"
 # 手动跳过当前步骤，继续下一步。
 SKIP_RESULT = "skip"
 
+# 命名坐标点：template 字段可直接使用这些名称，无需模板识别，直接点击对应位置。
+# 坐标以 NAMED_POINT_BASE_SIZE 为基准填写（像素），执行时按实际屏幕尺寸等比缩放；
+# Center 特殊处理为屏幕中心，不在此表中。
+# 坐标为 (x, y) 元组，单个轴可以是 None 表示尚未测量，使用时会报错并指出缺哪个轴。
+NAMED_POINT_BASE_SIZE = (1280, 720)
+NAMED_POINTS = {
+    # 三个敌人在同一行，y 均为 45
+    "enemy1": (45, 45),
+    "enemy2": (298, 45),
+    "enemy3": (545, 45),
+}
+
+
+def is_named_point(name):
+    """判断 template 字段是否为内置命名坐标点（Center、Enemy1 等）。"""
+    key = str(name).strip().casefold()
+    return key == "center" or key in NAMED_POINTS
+
+
+def resolve_named_point(name, width, height):
+    """把命名坐标点解析为当前屏幕尺寸下的实际坐标 (x, y)。"""
+    key = str(name).strip().casefold()
+    if key == "center":
+        return (width // 2, height // 2)
+    if key not in NAMED_POINTS:
+        return None
+    point = NAMED_POINTS[key]
+    base_x, base_y = point
+    if base_x is None or base_y is None:
+        missing = "x" if base_x is None else "y"
+        raise ValueError(
+            f"Named point {name!r} has no {missing} coordinate configured yet, "
+            f"fill it in NAMED_POINTS of task_executor.py"
+        )
+    base_width, base_height = NAMED_POINT_BASE_SIZE
+    return (
+        round(base_x * width / base_width),
+        round(base_y * height / base_height),
+    )
+
+
+def expand_named_steps(steps):
+    """结构解析（无需设备）：把命名坐标点步骤展开为统一的点击步骤形态。
+
+    - single 模式的命名点 → 含 `click: None` 占位的点击步骤，template 保留原名用于显示
+    - multi 模式列表中的命名点拆分为独立点击步骤，置于识别步骤之前
+    - 其余步骤原样保留
+    展开只依赖步骤本身，可在无设备时用于界面展示，保证展示行数与
+    运行时步骤一一对应；坐标由运行前的 resolve_steps 解析。
+    """
+    expanded = []
+    for step in steps:
+        template_path = step.get("template")
+        if not template_path:
+            continue
+        mode = str(step.get("mode") or "single").strip().lower()
+        if mode == "multi":
+            named, normal = _split_named_points(template_path)
+            for name in named:
+                expanded.append({**step, "template": name, "click": None})
+            if normal:
+                expanded.append({**step, "template": ",".join(normal)})
+        elif is_named_point(template_path):
+            expanded.append({**step, "click": None})
+        else:
+            expanded.append(step)
+    return expanded
+
+
+def resolve_steps(steps, adb_path=ADB_PATH, device=None):
+    """运行前解析：展开命名坐标点并把占位坐标换算为实际屏幕坐标。
+
+    坐标换算需要屏幕尺寸，须在设备连接后调用；未配置坐标的命名点
+    在此报错，任务不会开始执行。
+    """
+    expanded = expand_named_steps(steps)
+    width, height = get_size(adb_path=adb_path, device=device)
+    resolved = []
+    for step in expanded:
+        if "click" not in step:
+            resolved.append(step)
+            continue
+        mode = str(step.get("mode") or "single").strip().lower()
+        if mode == "none":
+            raise ValueError(
+                f"Step with mode 'none' cannot use named point {step.get('template')!r}"
+            )
+        x, y = resolve_named_point(step["template"], width, height)
+        resolved.append({**step, "click": [x, y]})
+    return resolved
+
+
+def _split_named_points(template_path):
+    """把逗号分隔的 template 拆成 (命名坐标点列表, 普通模板列表)。"""
+    named, normal = [], []
+    for part in str(template_path).split(","):
+        part = part.strip()
+        if not part:
+            continue
+        (named if is_named_point(part) else normal).append(part)
+    return named, normal
+
 
 def _step_float(step, key, default):
     """读取步骤中的数值字段。"""
@@ -103,10 +205,6 @@ def execute_step(
     )
     clicker = click_fn or _build_clicker(adb_path, device)
 
-    template_path = step.get("template")
-    if not template_path:
-        return False
-
     # 除 template 外全部字段可省略：mode 默认 single，index 默认 0，region 默认全屏
     mode = str(step.get("mode") or "single").strip().lower()
     if mode not in ("single", "multi", "none"):
@@ -141,15 +239,35 @@ def execute_step(
             f"Invalid step_interval value: {step_interval}, must be non-negative"
         )
 
-    if str(template_path).strip().casefold() == "center":
+    template_path = step.get("template")
+
+    # 解析阶段（resolve_steps）产出的固定坐标点击步骤：click 为坐标 [x, y]，
+    # 无需模板识别。直接调用 execute_step 时也在此兜底解析命名坐标点。
+    click_target = step.get("click")
+    if click_target is None and template_path and is_named_point(template_path):
         if mode == "none":
-            raise ValueError("Step with mode 'none' cannot use template 'Center'")
+            raise ValueError(
+                f"Step with mode 'none' cannot use named point {template_path!r}"
+            )
+        if mode == "multi":
+            raise ValueError(
+                f"Named point {template_path!r} must be resolved by resolve_steps() "
+                f"before execute_step (named points in multi lists are split there)"
+            )
         width, height = get_size(adb_path=adb_path, device=device)
-        print(f"[task] step template=Center, click=({width // 2}, {height // 2})")
-        result = clicker(width // 2, height // 2)
+        click_target = resolve_named_point(template_path, width, height)
+
+    if click_target is not None:
+        x, y = int(click_target[0]), int(click_target[1])
+        label = f"template={template_path}, " if template_path else ""
+        print(f"[task] step {label}click=({x}, {y})")
+        result = clicker(x, y)
         if result and step_interval:
             sleep_fn(step_interval)
         return result
+
+    if not template_path:
+        return False
 
     if mode == "multi":
         # multi 模式：template 为逗号分隔的多个模板，必须提供 count，取 TOP count 逐个点击
@@ -167,6 +285,11 @@ def execute_step(
         template_paths = [t.strip() for t in str(template_path).split(",") if t.strip()]
         if not template_paths:
             return False
+        if any(is_named_point(t) for t in template_paths):
+            raise ValueError(
+                f"Named point in a multi list must be resolved by resolve_steps() "
+                f"first: {template_path!r}"
+            )
 
         print(
             f"[task] step templates={template_paths}, mode=multi, count={count}, "
@@ -250,7 +373,7 @@ def execute_task(
     if not isinstance(task, dict):
         raise ValueError(f"Task must be a dict, got {type(task).__name__}")
 
-    for step in valid_steps(task):
+    for step in resolve_steps(valid_steps(task), adb_path=adb_path, device=device):
         if should_stop is not None and should_stop():
             return False
         result = execute_step(

@@ -32,7 +32,8 @@ class TaskStepTable(QTableWidget):
         self.setRowCount(len(steps))
         for row, step in enumerate(steps):
             region = step.get("region") or "全屏"
-            mode = step.get("mode") or "single"
+            # 命名坐标点解析出的固定点击步骤没有识别模式，显示为“点击”
+            mode = "点击" if "click" in step else (step.get("mode") or "single")
             values = (
                 str(row + 1),
                 str(step.get("template", "")),
