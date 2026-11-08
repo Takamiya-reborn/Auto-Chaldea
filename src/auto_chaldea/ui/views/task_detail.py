@@ -1,4 +1,4 @@
-"""右侧任务详情区域：描述、步骤表格和执行控制。"""
+# 右侧任务详情区域：描述、步骤表格和执行控制
 
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QIntValidator
@@ -8,33 +8,30 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
-    QToolButton,
     QStackedWidget,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 
-from auto_chaldea.ui.icons import (
+from auto_chaldea.core.task_executor import expand_named_steps
+from auto_chaldea.core.task_schema import valid_steps
+from auto_chaldea.ui.common.icons import (
     next_icon,
     pause_icon,
     play_icon,
     stop_icon,
     tasks_icon,
 )
-from auto_chaldea.ui.theme import FGO
+from auto_chaldea.ui.common.theme import FGO
+from auto_chaldea.ui.runtime.worker import TaskWorker
+from auto_chaldea.ui.widgets.task_table import TaskStepTable
 from auto_chaldea.utils.adb_device import disconnect_device
-from auto_chaldea.core.task_executor import expand_named_steps
-from auto_chaldea.core.task_schema import valid_steps
-from auto_chaldea.ui.task_table import TaskStepTable
-from auto_chaldea.ui.worker import TaskWorker
 
 
+# 显示当前选中任务的描述，未选中时显示空状态提示；
+# 底部操作栏提供设备端口输入和执行 / 暂停 / 停止按钮
 class TaskDetailView(QWidget):
-    """显示当前选中任务的描述；未选中时显示空状态提示。
-
-    底部操作栏提供设备端口输入和执行 / 暂停 / 停止按钮。
-    """
-
     device_disconnected = Signal(int)
 
     def __init__(self, parent=None):
@@ -162,12 +159,10 @@ class TaskDetailView(QWidget):
 
     # ---- 公开接口 ----
 
+    # 切换当前展示的任务，task 为 None 时回到空状态；
+    # 切换前先终止后台线程，否则旧任务继续占用设备且其信号
+    # 会写进新任务的表格
     def set_task(self, task, filename=""):
-        """切换当前展示的任务；task 为 None 时回到空状态。
-
-        切换（含列表刷新导致的重新选中）前先终止仍在执行的后台线程，
-        否则旧任务会继续占用设备，其步骤信号还会写进新任务的表格。
-        """
         self._cancel_running_worker()
         self._task = task
         self._filename = filename
@@ -191,8 +186,8 @@ class TaskDetailView(QWidget):
         self._table.set_steps(steps)
         self._stack.setCurrentIndex(1)
 
+    # 窗口关闭前停止后台任务并断开 ADB 连接
     def shutdown(self):
-        """窗口关闭前停止后台任务并断开 ADB 连接。"""
         if self._worker is not None:
             self._worker.stop()
             self._worker.wait()
@@ -204,19 +199,17 @@ class TaskDetailView(QWidget):
             except ValueError:
                 pass
 
+    # 记录启动时已连接的设备端口并更新状态提示
     def set_device_port(self, port):
-        """记录启动时已连接的设备端口并更新状态提示。"""
         self._port_edit.setText(str(port))
         self._set_status(f"已连接 127.0.0.1:{port}", FGO["success"])
 
     # ---- 任务执行 ----
 
+    # 终止仍在执行的后台线程并把界面复位到非运行态；
+    # 先断开 worker 的全部信号再停止，避免排队中的步骤事件
+    # 在线程结束后仍投递到已切换的新表格
     def _cancel_running_worker(self):
-        """终止仍在执行的后台线程并把界面复位到非运行态。
-
-        先断开该 worker 的全部信号再停止，避免排队中的步骤事件在
-        线程结束后仍投递到已切换的新表格上。
-        """
         worker = self._worker
         if worker is None:
             return

@@ -1,18 +1,17 @@
-"""FGO 风格的最左侧活动栏：菱形底板图标 + 金色选中指示。"""
+# 最左侧活动栏：菱形底板图标 + 金色选中指示
 
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import QToolButton, QVBoxLayout, QWidget
 
-from auto_chaldea.ui.icons import diamond_icon
+from auto_chaldea.ui.common.icons import diamond_icon
 
 _GLYPHS = ["fa6s.list-ul", "fa6s.images", "fa6s.gear"]
 _DISCONNECT_GLYPH = "fa6s.plug-circle-xmark"
 _DIAMOND_SIZE = 34  # 菱形底板边长（按钮高 46，留少量呼吸感）
 
 
+# 点击图标切换侧栏面板，再次点击收起侧栏
 class ActivityBar(QWidget):
-    """窄图标栏，点击图标切换侧栏面板，再次点击收起侧栏。"""
-
     panel_requested = Signal(int)  # 参数：面板序号
     disconnect_requested = Signal()  # 手动断开当前设备
 
@@ -44,7 +43,9 @@ class ActivityBar(QWidget):
 
     def _apply_icon(self, button, glyph, lit):
         button.setIcon(
-            diamond_icon(glyph, size=_DIAMOND_SIZE, lit=lit, dpr=button.devicePixelRatioF())
+            diamond_icon(
+                glyph, size=_DIAMOND_SIZE, lit=lit, dpr=button.devicePixelRatioF()
+            )
         )
 
     def _create_button(self, index, tooltip):
@@ -73,14 +74,14 @@ class ActivityBar(QWidget):
         button.clicked.connect(lambda: self.disconnect_requested.emit())
         return button
 
+    # 高亮指定面板的图标
     def set_checked(self, index):
-        """高亮指定面板的图标。"""
         for i, button in enumerate(self._buttons):
             button.setChecked(i == index)
         self._update_icons(index)
 
+    # 取消所有图标的高亮（侧栏被收起时）
     def clear_checked(self):
-        """取消所有图标的高亮（侧栏被收起时）。"""
         for button in self._buttons:
             button.setChecked(False)
         self._update_icons(-1)

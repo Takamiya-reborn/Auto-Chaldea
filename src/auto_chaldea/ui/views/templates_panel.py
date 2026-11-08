@@ -1,10 +1,9 @@
-"""侧栏中的模板库面板，按目录结构展示 assets/template 下的模板图像。"""
+# 侧栏模板库面板，按目录结构展示 assets/template 下的模板图像
 
 from pathlib import Path
 
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QIcon, QImage, QPainter, QPixmap
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QColor, QIcon, QImage, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -15,16 +14,16 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from auto_chaldea.utils.paths import TEMPLATE_DIR
-from auto_chaldea.ui.card_tree import (
+from auto_chaldea.ui.common.icons import dir_node_icon, refresh_icon
+from auto_chaldea.ui.common.theme import FGO
+from auto_chaldea.ui.widgets.card_tree import (
+    VIEWPORT_MARGINS,
     CardTreeWidget,
     FastTreeStyle,
-    VIEWPORT_MARGINS,
     open_directory,
     reveal_file,
 )
-from auto_chaldea.ui.icons import dir_node_icon, refresh_icon
-from auto_chaldea.ui.theme import FGO
+from auto_chaldea.utils.paths import TEMPLATE_DIR
 
 _PREVIEW_MARGIN = 16  # 预览图四周留白
 _CHECKER_SIZE = 10  # 透明区棋盘格边长
@@ -32,9 +31,8 @@ _CHECKER_LIGHT = QColor("#22384f")
 _CHECKER_DARK = QColor("#1a3049")
 
 
+# 保持宽高比缩放显示模板大图，透明区域绘制棋盘格
 class _PreviewCanvas(QLabel):
-    """保持宽高比缩放显示模板大图，透明区域绘制棋盘格。"""
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAlignment(Qt.AlignCenter)
@@ -48,9 +46,9 @@ class _PreviewCanvas(QLabel):
         if self._original.isNull():
             self.clear()
             return
-        avail = (self.size() - QSize(_PREVIEW_MARGIN * 2, _PREVIEW_MARGIN * 2)).expandedTo(
-            QSize(1, 1)
-        )
+        avail = (
+            self.size() - QSize(_PREVIEW_MARGIN * 2, _PREVIEW_MARGIN * 2)
+        ).expandedTo(QSize(1, 1))
         scaled = self._original.scaled(
             avail, Qt.KeepAspectRatio, Qt.SmoothTransformation
         )
@@ -68,7 +66,9 @@ class _PreviewCanvas(QLabel):
         tile.fill(_CHECKER_LIGHT)
         painter = QPainter(tile)
         painter.fillRect(0, 0, _CHECKER_SIZE, _CHECKER_SIZE, _CHECKER_DARK)
-        painter.fillRect(_CHECKER_SIZE, _CHECKER_SIZE, _CHECKER_SIZE, _CHECKER_SIZE, _CHECKER_DARK)
+        painter.fillRect(
+            _CHECKER_SIZE, _CHECKER_SIZE, _CHECKER_SIZE, _CHECKER_SIZE, _CHECKER_DARK
+        )
         painter.end()
         return tile
 
@@ -77,9 +77,8 @@ class _PreviewCanvas(QLabel):
         self._update_scaled()
 
 
+# 以目录树展示模板图像，选中项通过信号交给详情区放大显示
 class TemplatesPanel(QWidget):
-    """以目录树展示模板图像；选中项通过信号交给详情区放大显示。"""
-
     template_selected = Signal(object)  # 选中的模板 Path，取消选择时为 None
 
     def __init__(self, parent=None):
@@ -127,8 +126,8 @@ class TemplatesPanel(QWidget):
 
         self.refresh_templates()
 
+    # 重新扫描模板目录构建整棵树，默认收起目录
     def refresh_templates(self):
-        """重新扫描模板目录构建整棵树，默认收起目录。"""
         self._tree.blockSignals(True)
         self._tree.clear()
 
@@ -137,12 +136,14 @@ class TemplatesPanel(QWidget):
         self._tree.blockSignals(False)
         self._emit_selection()
 
+    # 递归填充目录内容，目录在前、图像在后，各自按名称排序
     def _fill_branch(self, parent_item, dir_path):
-        """递归填充目录内容；目录在前、图像在后，各自按名称排序。"""
         if not dir_path.exists():
             return
 
-        entries = sorted(dir_path.iterdir(), key=lambda path: (path.is_file(), path.name))
+        entries = sorted(
+            dir_path.iterdir(), key=lambda path: (path.is_file(), path.name)
+        )
         for path in entries:
             if path.is_dir():
                 child = self._make_dir_item(path)
@@ -163,7 +164,9 @@ class TemplatesPanel(QWidget):
 
     def _make_image_item(self, path):
         image = QImage(str(path))
-        size_text = f"{image.width()}×{image.height()}" if not image.isNull() else "未知尺寸"
+        size_text = (
+            f"{image.width()}×{image.height()}" if not image.isNull() else "未知尺寸"
+        )
         item = QTreeWidgetItem()
         item.setText(0, path.stem)
         item.setTextAlignment(0, Qt.AlignLeft | Qt.AlignVCenter)
@@ -183,14 +186,14 @@ class TemplatesPanel(QWidget):
             return
         self.template_selected.emit(path)
 
+    # 点击目录节点时展开 / 收起，图像节点交给默认选择行为
     def _toggle_dir_item(self, item, _column):
-        """点击目录节点时展开 / 收起；图像节点交给默认的选择行为。"""
         if item.flags() & Qt.ItemIsSelectable:
             return
         item.setExpanded(not item.isExpanded())
 
+    # 目录展开时把图标切换为打开状态
     def _expand_dir_item(self, item):
-        """目录展开时把图标切换为打开状态。"""
         self._set_dir_icon(item, True)
 
     # ---- 展开状态图标 ----
@@ -209,8 +212,8 @@ class TemplatesPanel(QWidget):
         if menu.exec(self._tree.mapToGlobal(pos)) is reveal_action:
             self._reveal_in_explorer(self._tree.itemAt(pos))
 
+    # 在文件管理器中定位右键的节点，空白处显示模板根目录
     def _reveal_in_explorer(self, item):
-        """在系统文件管理器中定位右键的节点；空白处显示模板根目录。"""
         if item is None:
             open_directory(TEMPLATE_DIR)
             return
@@ -228,9 +231,8 @@ class TemplatesPanel(QWidget):
             open_directory(TEMPLATE_DIR)
 
 
+# 占据任务详情位置的模板放大预览
 class TemplateDetailView(QWidget):
-    """占据任务详情位置的模板放大预览。"""
-
     def __init__(self, parent=None):
         super().__init__(parent)
 

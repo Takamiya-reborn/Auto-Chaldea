@@ -1,11 +1,11 @@
-"""通过 ADB 执行任务步骤。"""
+# 通过 ADB 执行任务步骤
 
 import time
 
+from auto_chaldea.core.task_schema import normalize_region, valid_steps
 from auto_chaldea.utils.adb_device import click, get_size
 from auto_chaldea.utils.paths import ADB_PATH, TEMPLATE_DIR
 from auto_chaldea.utils.recognizer import find_all_matches, find_all_matches_multi
-from auto_chaldea.core.task_schema import normalize_region, valid_steps
 
 # 识别不到目标时的默认重试间隔（秒），也是退避的起始间隔
 DEFAULT_RETRY_INTERVAL = 0.2
@@ -33,14 +33,14 @@ NAMED_POINTS = {
 }
 
 
+# 判断 template 字段是否为内置命名坐标点
 def is_named_point(name):
-    """判断 template 字段是否为内置命名坐标点（Center、Enemy1 等）。"""
     key = str(name).strip().casefold()
     return key == "center" or key in NAMED_POINTS
 
 
+# 命名坐标点 → 当前屏幕尺寸下的实际坐标 (x, y)
 def resolve_named_point(name, width, height):
-    """把命名坐标点解析为当前屏幕尺寸下的实际坐标 (x, y)。"""
     key = str(name).strip().casefold()
     if key == "center":
         return (width // 2, height // 2)
@@ -61,15 +61,11 @@ def resolve_named_point(name, width, height):
     )
 
 
+# 结构解析（无需设备）：把命名坐标点步骤展开为统一的点击步骤形态。
+# single 命名点 → 含 click: None 占位的步骤；multi 列表中的命名点拆为
+# 独立点击步骤置于识别步骤之前；其余原样保留。展开只依赖步骤本身，
+# 可在无设备时用于界面展示，保证展示行数与运行时一一对应
 def expand_named_steps(steps):
-    """结构解析（无需设备）：把命名坐标点步骤展开为统一的点击步骤形态。
-
-    - single 模式的命名点 → 含 `click: None` 占位的点击步骤，template 保留原名用于显示
-    - multi 模式列表中的命名点拆分为独立点击步骤，置于识别步骤之前
-    - 其余步骤原样保留
-    展开只依赖步骤本身，可在无设备时用于界面展示，保证展示行数与
-    运行时步骤一一对应；坐标由运行前的 resolve_steps 解析。
-    """
     expanded = []
     for step in steps:
         template_path = step.get("template")
@@ -89,12 +85,9 @@ def expand_named_steps(steps):
     return expanded
 
 
+# 运行前解析：展开命名坐标点并把占位坐标换算为实际屏幕坐标；
+# 坐标换算需要屏幕尺寸，须在设备连接后调用
 def resolve_steps(steps, adb_path=ADB_PATH, device=None):
-    """运行前解析：展开命名坐标点并把占位坐标换算为实际屏幕坐标。
-
-    坐标换算需要屏幕尺寸，须在设备连接后调用；未配置坐标的命名点
-    在此报错，任务不会开始执行。
-    """
     expanded = expand_named_steps(steps)
     width, height = get_size(adb_path=adb_path, device=device)
     resolved = []
@@ -112,8 +105,8 @@ def resolve_steps(steps, adb_path=ADB_PATH, device=None):
     return resolved
 
 
+# 逗号分隔的 template → (命名坐标点列表, 普通模板列表)
 def _split_named_points(template_path):
-    """把逗号分隔的 template 拆成 (命名坐标点列表, 普通模板列表)。"""
     named, normal = [], []
     for part in str(template_path).split(","):
         part = part.strip()
@@ -124,7 +117,6 @@ def _split_named_points(template_path):
 
 
 def _step_float(step, key, default):
-    """读取步骤中的数值字段。"""
     value = step.get(key)
     return default if value in (None, "") else float(value)
 
@@ -139,13 +131,8 @@ def _recognize_with_retry(
     should_stop=None,
     should_skip=None,
 ):
-    """反复识别直到出现匹配；超时返回 None，外部请求停止时返回空列表。
-
-    recognize 为无参回调，返回匹配列表（非空视为匹配成功）；
-    识别失败时重试间隔从 retry_interval 起按倍数退避，封顶于
-    max_retry_interval 后不再增长；should_stop 为可选回调，每次
-    重试前调用，返回 True 时放弃等待。
-    """
+    # 反复识别直到出现匹配：超时返回 None，外部请求停止返回空列表，
+    # 请求跳过返回 SKIP_RESULT；识别失败时间隔按倍数退避并封顶
     deadline = time.monotonic() + timeout if timeout is not None else None
     interval = retry_interval
     attempts = 0
@@ -195,7 +182,7 @@ def execute_step(
     should_stop=None,
     should_skip=None,
 ):
-    """执行一步任务，识别失败时按退避间隔重试。"""
+    # 执行一步任务，识别失败时按退避间隔重试
     if not isinstance(step, dict):
         raise ValueError(f"Step must be a dict, got {type(step).__name__}")
 
@@ -369,7 +356,7 @@ def execute_task(
     device=None,
     should_stop=None,
 ):
-    """按顺序执行任务中的有效步骤。"""
+    # 按顺序执行任务中的有效步骤
     if not isinstance(task, dict):
         raise ValueError(f"Task must be a dict, got {type(task).__name__}")
 

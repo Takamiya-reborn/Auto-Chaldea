@@ -6,12 +6,13 @@ from auto_chaldea.utils.paths import ADB_PATH
 from auto_chaldea.utils.process import hidden_window_kwargs
 
 
+# ADB 操作无法访问设备
 class DeviceDisconnectedError(RuntimeError):
-    """ADB 操作无法访问设备。"""
+    pass
 
 
+# 连接本机回环地址上的 Android 设备
 def connect_to_device(port, adb_path=ADB_PATH):
-    """连接本机回环地址上的 Android 设备。"""
     address = _device_address(port)
     try:
         result = subprocess.run(
@@ -44,8 +45,8 @@ def connect_to_device(port, adb_path=ADB_PATH):
     return True
 
 
+# 断开本机回环地址上的 Android 设备
 def disconnect_device(port, adb_path=ADB_PATH):
-    """断开本机回环地址上的 Android 设备。"""
     address = _device_address(port)
     try:
         result = subprocess.run(
@@ -75,8 +76,8 @@ def disconnect_device(port, adb_path=ADB_PATH):
     return True
 
 
+# 点击设备屏幕坐标
 def click(x, y, adb_path=ADB_PATH, device=None):
-    """点击设备屏幕坐标。"""
     command = _device_command(adb_path, device, "shell", "input", "tap", int(x), int(y))
     try:
         result = subprocess.run(
@@ -89,16 +90,16 @@ def click(x, y, adb_path=ADB_PATH, device=None):
     return True
 
 
+# 连续点击两次
 def double_click(x, y, interval=0.1, adb_path=ADB_PATH, device=None):
-    """连续点击两次。"""
     first_result = click(x, y, adb_path=adb_path, device=device)
     time.sleep(interval)
     second_result = click(x, y, adb_path=adb_path, device=device)
     return first_result and second_result
 
 
+# 读取设备屏幕尺寸
 def get_size(adb_path=ADB_PATH, device=None):
-    """读取设备屏幕尺寸。"""
     command = _device_command(adb_path, device, "shell", "wm", "size")
     try:
         result = subprocess.run(

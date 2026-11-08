@@ -1,4 +1,4 @@
-"""任务步骤和执行结果表格。"""
+# 任务步骤和执行结果表格
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
@@ -9,14 +9,13 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
 )
 
-from auto_chaldea.ui.theme import FGO
+from auto_chaldea.ui.common.theme import FGO
 
 HEADERS = ("#", "模板", "匹配序号", "区域", "模式", "结果")
 
 
+# 显示步骤并提供结果更新接口
 class TaskStepTable(QTableWidget):
-    """显示步骤并提供结果更新接口。"""
-
     def __init__(self, parent=None):
         super().__init__(0, len(HEADERS), parent)
         self.setHorizontalHeaderLabels(list(HEADERS))
@@ -61,12 +60,9 @@ class TaskStepTable(QTableWidget):
             item.setText(text)
             item.setForeground(QColor(color))
 
+    # 金琥珀底高亮执行中的行并滚动到可见位置；写 BackgroundRole
+    # 不受选中样式影响（选中底色与表格奶油底几乎同色，无法指示）
     def set_running_row(self, row):
-        """金琥珀底高亮正在执行的步骤行，并滚动到可见位置。
-
-        独立于选中态：新 QSS 下选中底色与表格奶油底几乎同色，无法
-        起到指示作用；直接写 BackgroundRole 不受选中样式影响。
-        """
         if row == self._running_row:
             return
         self._clear_running_row()
@@ -87,8 +83,8 @@ class TaskStepTable(QTableWidget):
         if first is not None:
             self.scrollToItem(first, QAbstractItemView.EnsureVisible)
 
+    # 移除执行中高亮（结果列文字保留）
     def clear_running_row(self):
-        """移除执行中高亮（结果列文字保留）。"""
         self._clear_running_row()
 
     def _clear_running_row(self):

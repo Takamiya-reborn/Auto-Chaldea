@@ -1,7 +1,7 @@
-"""后台监控已连接设备的在线状态。"""
+# 后台监控已连接设备的在线状态
 
-import threading
 import subprocess
+import threading
 
 from PySide6.QtCore import QThread, Signal
 
@@ -9,9 +9,8 @@ from auto_chaldea.utils.paths import ADB_PATH
 from auto_chaldea.utils.process import hidden_window_kwargs
 
 
+# 后台监听设备是否从 ADB 在线列表中消失
 class DeviceMonitor(QThread):
-    """在后台监听设备是否从 ADB 在线列表中消失。"""
-
     disconnected = Signal()
 
     def __init__(self, port, adb_path=ADB_PATH, parent=None):
@@ -22,8 +21,8 @@ class DeviceMonitor(QThread):
         self._process = None
         self._process_lock = threading.Lock()
 
+    # 请求监控线程退出
     def stop(self):
-        """请求监控线程退出。"""
         self._stop_requested.set()
         with self._process_lock:
             process = self._process
@@ -79,8 +78,8 @@ class DeviceMonitor(QThread):
         if device_online and not self._stop_requested.is_set():
             self.disconnected.emit()
 
+    # 判断设备状态更新中是否包含目标设备
     def _payload_has_device(self, payload):
-        """判断设备状态更新中是否包含目标设备。"""
         text = payload.decode("utf-8", errors="replace")
         for line in text.splitlines():
             parts = line.split()

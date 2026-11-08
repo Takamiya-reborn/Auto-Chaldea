@@ -1,12 +1,10 @@
-"""后台任务执行线程，支持暂停、继续和停止。"""
+# 后台任务执行线程，支持暂停、继续和停止
 
 import threading
 import time
 
 from PySide6.QtCore import QThread, Signal
 
-from auto_chaldea.utils.adb_device import DeviceDisconnectedError, connect_to_device
-from auto_chaldea.utils.paths import ADB_PATH, TEMPLATE_DIR
 from auto_chaldea.core.task_executor import (
     SKIP_RESULT,
     TIMEOUT_RESULT,
@@ -14,15 +12,13 @@ from auto_chaldea.core.task_executor import (
     resolve_steps,
 )
 from auto_chaldea.core.task_schema import valid_steps
+from auto_chaldea.utils.adb_device import DeviceDisconnectedError, connect_to_device
+from auto_chaldea.utils.paths import ADB_PATH, TEMPLATE_DIR
 
 
+# 在独立线程中顺序执行任务步骤，通过 pause / resume / stop 从主线程
+# 控制；所有信号排队投递到主线程，可安全更新界面
 class TaskWorker(QThread):
-    """在独立线程中顺序执行任务步骤。
-
-    通过 :meth:`pause` / :meth:`resume` / :meth:`stop` 从主线程控制执行，
-    所有信号都会排队投递到主线程，可安全地更新界面。
-    """
-
     step_started = Signal(int)  # 参数：步骤序号（从 0 开始）
     step_finished = Signal(int, str)  # 参数：步骤序号、结果状态
     execution_started = Signal(int)  # 参数：执行次数（从 1 开始）
@@ -57,8 +53,8 @@ class TaskWorker(QThread):
         self._stop_requested.set()
         self._resume_event.set()  # 唤醒暂停中的线程以便退出
 
+    # 请求跳过当前正在等待识别的步骤
     def skip_step(self):
-        """请求跳过当前正在等待识别的步骤。"""
         if self.isRunning():
             self._skip_requested.set()
 
@@ -68,14 +64,14 @@ class TaskWorker(QThread):
 
     # ---- 内部辅助 ----
 
+    # 暂停期间阻塞，直到恢复或请求停止
     def _wait_while_paused(self):
-        """暂停期间阻塞，直到恢复或请求停止。"""
         while not self._resume_event.wait(0.1):
             if self._stop_requested.is_set():
                 return
 
+    # 可被暂停 / 停止 / 跳过打断的等待，用作 execute_step 的 sleep_fn
     def _interruptible_sleep(self, seconds):
-        """可被暂停/停止打断的等待，用作 execute_step 的 sleep_fn。"""
         deadline = time.monotonic() + seconds
         while True:
             self._wait_while_paused()

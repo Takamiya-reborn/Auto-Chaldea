@@ -1,4 +1,4 @@
-"""FGO 游戏风配色、调色板和外部 QSS 加载。"""
+# FGO 配色、调色板与外部 QSS 加载
 
 from PySide6.QtGui import QColor, QPalette
 from PySide6.QtWidgets import QProxyStyle, QStyle
@@ -49,22 +49,21 @@ FGO = {
 }
 
 
+# 读取 assets/qss 下的全局样式表
 def build_stylesheet():
-    """读取 assets/qss 下的全局样式表。"""
     return APP_QSS.read_text(encoding="utf-8")
 
 
+# 收紧 Qt 内置部件动画时长（任务树展开 / 收起等）
 class _AnimationProxyStyle(QProxyStyle):
-    """收紧 Qt 内置部件动画时长，例如任务树的展开 / 收起动画。"""
-
     def styleHint(self, hint, option=None, widget=None, return_data=None):
         if hint == QStyle.SH_Widget_Animation_Duration:
             return WIDGET_ANIMATION_MS
         return super().styleHint(hint, option, widget, return_data)
 
 
+# 应用 Fusion 风格 + FGO 调色板 + 全局样式表
 def apply_theme(app):
-    """为 QApplication 应用 Fusion 风格、FGO 调色板和样式表。"""
     app.setStyle(_AnimationProxyStyle("fusion"))
 
     c = FGO

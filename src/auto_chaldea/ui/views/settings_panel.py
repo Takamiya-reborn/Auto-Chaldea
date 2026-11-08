@@ -2,9 +2,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget
 
 
+# 设置占位面板
 class SettingsPanel(QWidget):
-    """设置占位面板。"""
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("sidePanel")

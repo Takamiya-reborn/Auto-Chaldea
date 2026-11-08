@@ -28,8 +28,8 @@ REGION_ALIASES = {
 }
 
 
+# 区域字段统一为坐标元组
 def normalize_region(region):
-    """将区域字段统一为坐标元组。"""
     if region in (None, "", [], (), {}):
         return None
 
@@ -50,7 +50,7 @@ def normalize_region(region):
     return region
 
 
+# 返回包含有效模板名的步骤
 def valid_steps(task):
-    """返回包含有效模板名的步骤。"""
     steps = task.get("steps", []) if isinstance(task, dict) else []
     return [step for step in steps if isinstance(step, dict) and step.get("template")]

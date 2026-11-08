@@ -1,4 +1,4 @@
-"""启动时的设备连接对话框：输入模拟器端口，连接成功后进入主界面。"""
+# 启动时的设备连接对话框：输入模拟器端口，连接成功后进入主界面
 
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QIntValidator
@@ -13,15 +13,14 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
 )
 
+from auto_chaldea.ui.common.icons import device_icon
+from auto_chaldea.ui.common.theme import FGO
 from auto_chaldea.utils.adb_device import connect_to_device
 from auto_chaldea.utils.paths import ADB_PATH
-from auto_chaldea.ui.icons import device_icon
-from auto_chaldea.ui.theme import FGO
 
 
+# 输入模拟器的 ADB 端口号并连接设备
 class ConnectDialog(QDialog):
-    """输入模拟器的 ADB 端口号并连接设备。"""
-
     connected = Signal(int)  # 参数：连接成功的端口号
 
     def __init__(self, initial_port=None, notice=None, parent=None):
@@ -88,8 +87,8 @@ class ConnectDialog(QDialog):
         buttons.addWidget(self._connect_button)
         layout.addLayout(buttons)
 
+    # 返回连接成功的端口号；未连接时为 None
     def port(self):
-        """返回连接成功的端口号；未连接时为 None。"""
         return self._port
 
     def _try_connect(self):
@@ -103,9 +102,7 @@ class ConnectDialog(QDialog):
         except ValueError:
             port = 0
         if not 1 <= port <= 65535:
-            self._set_status(
-                "端口必须是 1 到 65535 之间的整数", FGO["attention"]
-            )
+            self._set_status("端口必须是 1 到 65535 之间的整数", FGO["attention"])
             return
 
         self._connect_button.setEnabled(False)
@@ -115,9 +112,7 @@ class ConnectDialog(QDialog):
 
         try:
             ok = connect_to_device(port, adb_path=ADB_PATH)
-        except (
-            Exception
-        ) as error:  # noqa: BLE001 - 连接出错不允许卡死对话框，必须可以重试
+        except Exception as error:  # noqa: BLE001 - 连接出错不允许卡死对话框，必须可以重试
             message = f"连接出错：{error}"
             self._set_status(message, FGO["danger"])
             self._port_edit.setFocus()

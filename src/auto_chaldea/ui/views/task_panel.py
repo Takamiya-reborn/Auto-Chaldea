@@ -1,4 +1,4 @@
-"""侧栏中的任务树面板，按目录结构加载 assets/task 下的 YAML 任务。"""
+# 侧栏任务树面板，按目录结构加载 assets/task 下的 YAML 任务
 
 from pathlib import Path
 
@@ -13,22 +13,27 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from auto_chaldea.utils.paths import TASK_DIR
 from auto_chaldea.core.task_loader import load_task_file
-from auto_chaldea.ui.card_tree import (
+from auto_chaldea.ui.common.icons import dir_node_icon, refresh_icon, task_node_icon
+from auto_chaldea.ui.common.theme import FGO
+from auto_chaldea.ui.widgets.card_tree import (
+    VIEWPORT_MARGINS as _VIEWPORT_MARGINS,
+)
+from auto_chaldea.ui.widgets.card_tree import (
     CardTreeWidget,
     FastTreeStyle,
-    VIEWPORT_MARGINS as _VIEWPORT_MARGINS,
+)
+from auto_chaldea.ui.widgets.card_tree import (
     open_directory as _open_directory,
+)
+from auto_chaldea.ui.widgets.card_tree import (
     reveal_file as _reveal_file,
 )
-from auto_chaldea.ui.icons import dir_node_icon, refresh_icon, task_node_icon
-from auto_chaldea.ui.theme import FGO
+from auto_chaldea.utils.paths import TASK_DIR
 
 
+# 以目录树展示任务配置，选中任务文件后通知详情区域
 class TaskPanel(QWidget):
-    """以目录树展示任务配置，选中任务文件后通知详情区域。"""
-
     task_selected = Signal(
         object, str
     )  # 参数：任务 dict、来源文件相对路径（不含扩展名）
@@ -78,12 +83,10 @@ class TaskPanel(QWidget):
 
         self.refresh_tasks()
 
+    # 重新扫描任务目录构建整棵树，任务内容在选中时按需加载；
+    # 目录项建树时递归预填充（只扫目录不读 YAML），避免展开时
+    # 先出现空容器、再突然渲染出子项
     def refresh_tasks(self):
-        """重新扫描任务目录构建整棵树；任务内容在选中时按需加载。
-
-        目录项建树时递归预填充（只做目录扫描，不读 YAML），避免展开时
-        先出现空容器、再突然渲染出子项的观感。
-        """
         self._tree.blockSignals(True)
         self._tree.clear()
 
@@ -92,8 +95,8 @@ class TaskPanel(QWidget):
         self._tree.blockSignals(False)
         self._emit_selection()
 
+    # 递归填充目录内容，不读取 YAML 文件
     def _fill_branch(self, parent_item, dir_path):
-        """递归填充目录内容，不读取 YAML 文件。"""
         if not dir_path.exists():
             return
 
@@ -144,14 +147,14 @@ class TaskPanel(QWidget):
             return
         self.task_selected.emit(task, current.data(0, Qt.UserRole + 1))
 
+    # 点击目录节点时展开 / 收起，文件节点交给默认选择行为
     def _toggle_dir_item(self, item, _column):
-        """点击目录节点时展开 / 收起；文件节点交给默认的选择行为。"""
         if item.flags() & Qt.ItemIsSelectable:
             return
         item.setExpanded(not item.isExpanded())
 
+    # 目录展开时把图标切换为打开状态
     def _expand_dir_item(self, item):
-        """目录展开时把图标切换为打开状态。"""
         self._set_dir_icon(item, True)
 
     # ---- 展开状态图标 ----
@@ -159,9 +162,7 @@ class TaskPanel(QWidget):
     def _set_dir_icon(self, item, expanded):
         item.setIcon(
             0,
-            dir_node_icon(
-                FGO["gold"], FGO["muted"], 90 if expanded else 0
-            ),
+            dir_node_icon(FGO["gold"], FGO["muted"], 90 if expanded else 0),
         )
 
     # ---- 右键菜单 ----
@@ -172,8 +173,8 @@ class TaskPanel(QWidget):
         if menu.exec(self._tree.mapToGlobal(pos)) is reveal_action:
             self._reveal_in_explorer(self._tree.itemAt(pos))
 
+    # 在文件管理器中定位右键的节点，空白处显示任务根目录
     def _reveal_in_explorer(self, item):
-        """在系统文件管理器中定位右键的节点；空白处显示任务根目录。"""
         if item is None:
             _open_directory(TASK_DIR)
             return

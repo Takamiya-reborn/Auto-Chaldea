@@ -24,6 +24,9 @@ Auto-Chaldea 是一个基于 ADB、OpenCV 和 PySide6 的 FGO 自动化辅助工
 
 ### 2. 模板识别引擎
 
+> **分辨率要求**：内置模板均以 1280×720 分辨率采集，任务中的 `region` 坐标也以 1280×720 为基准。
+> 模板匹配不做任何缩放，请将设备（模拟器或真机）分辨率固定为 **1280×720** ，其他分辨率下识别会失败。
+
 - 基于 OpenCV 的模板匹配识别 UI 元素
 - 支持全屏识别和 ROI（感兴趣区域）识别
 - 支持单模板识别和多模板识别
@@ -148,7 +151,7 @@ uv run scripts/check.py "Path to template image" --device SERIAL
 
 ## 任务 YAML 介绍
 
-任务配置位于 `assets/task/`，一个最小示例如下：
+任务配置位于 `assets/task/`，一个最小示例如下（`region` 与内置坐标点均以 1280×720 分辨率为基准，见上文「模板识别引擎」的分辨率要求）：
 
 ```yaml
 task_name: 示例任务

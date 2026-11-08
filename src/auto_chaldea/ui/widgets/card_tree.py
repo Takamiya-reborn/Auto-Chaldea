@@ -1,34 +1,36 @@
-"""FGO 奶油卡片式树组件，供任务树 / 模板树等目录树复用。"""
+# FGO 奶油卡片式树，供任务树 / 模板树等目录树复用
 
 import subprocess
 import sys
 
-from PySide6.QtCore import QEvent, QModelIndex, QPersistentModelIndex, QRectF, QUrl, Qt
-from PySide6.QtGui import QColor, QDesktopServices, QLinearGradient, QPainter, QPalette, QPen
+from PySide6.QtCore import QEvent, QModelIndex, QPersistentModelIndex, QRectF, Qt, QUrl
+from PySide6.QtGui import (
+    QColor,
+    QDesktopServices,
+    QLinearGradient,
+    QPainter,
+    QPalette,
+    QPen,
+)
 from PySide6.QtWidgets import QProxyStyle, QStyle, QTreeWidget
 
-from auto_chaldea.ui.theme import FGO
+from auto_chaldea.ui.common.theme import FGO
 
 # 卡片与视口边缘的留白（setContentsMargins 对滚动区视口无效）
 VIEWPORT_MARGINS = (8, 6, 8, 8)
 
 
+# 缩短树展开 / 收起动画时长
 class FastTreeStyle(QProxyStyle):
-    """缩短树展开和收起的动画时长。"""
-
     def styleHint(self, hint, option=None, widget=None, returnData=None):
         if hint == self.StyleHint.SH_Widget_Animation_Duration:
             return 120
         return super().styleHint(hint, option, widget, returnData)
 
 
+# 卡片式树：每行为常驻金边的奶油卡片，整行自绘并随层级缩进；
+# 选中态查 selectionModel，悬停态自行跟踪
 class CardTreeWidget(QTreeWidget):
-    """FGO 卡片式树，每行为常驻金边的奶油卡片。
-
-    卡片背景整行自绘，并随层级右移缩进表达嵌套关系；选中态查
-    selectionModel，悬停态自行跟踪。
-    """
-
     def __init__(self, parent=None):
         super().__init__(parent)
         self._hover_index = QPersistentModelIndex()
@@ -58,8 +60,8 @@ class CardTreeWidget(QTreeWidget):
         self._set_hover_index(QModelIndex())
         super().leaveEvent(event)
 
+    # 切换悬停行并重绘受影响的两行
     def _set_hover_index(self, index):
-        """切换悬停行并重绘受影响的两行。"""
         if index == self._hover_index:
             return
         old = QModelIndex(self._hover_index)
@@ -143,8 +145,8 @@ def open_directory(path):
     QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
 
 
+# 在资源管理器中选中文件；非 Windows 退化为打开所在目录
 def reveal_file(path):
-    """在资源管理器中选中文件；非 Windows 平退化为打开所在目录。"""
     if sys.platform == "win32":
         # explorer 的 /select 参数不支持 list 形式的自动引号，需手工拼接
         subprocess.run(f'explorer /select,"{path}"', check=False)

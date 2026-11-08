@@ -13,11 +13,11 @@ APP_QSS = QSS_DIR / "app.qss"
 
 
 __all__ = [
-    "REPO_ROOT",
-    "ASSETS_DIR",
     "ADB_PATH",
-    "TEMPLATE_DIR",
-    "TASK_DIR",
-    "QSS_DIR",
     "APP_QSS",
+    "ASSETS_DIR",
+    "QSS_DIR",
+    "REPO_ROOT",
+    "TASK_DIR",
+    "TEMPLATE_DIR",
 ]

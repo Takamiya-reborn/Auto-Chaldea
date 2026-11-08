@@ -1,4 +1,4 @@
-"""VSCode 风格主窗口：活动栏 + 侧栏面板 + 任务详情。"""
+# 主窗口：活动栏 + 侧栏面板 + 详情区
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
@@ -10,21 +10,20 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from auto_chaldea.ui.activity_bar import ActivityBar
-from auto_chaldea.ui.device_monitor import DeviceMonitor
-from auto_chaldea.ui.task_detail import TaskDetailView
-from auto_chaldea.ui.task_panel import TaskPanel
-from auto_chaldea.ui.settings_panel import SettingsPanel
-from auto_chaldea.ui.templates_panel import TemplateDetailView, TemplatesPanel
+from auto_chaldea.ui.runtime.device_monitor import DeviceMonitor
+from auto_chaldea.ui.views.settings_panel import SettingsPanel
+from auto_chaldea.ui.views.task_detail import TaskDetailView
+from auto_chaldea.ui.views.task_panel import TaskPanel
+from auto_chaldea.ui.views.templates_panel import TemplateDetailView, TemplatesPanel
+from auto_chaldea.ui.widgets.activity_bar import ActivityBar
 
 PANEL_TASKS = 0
 PANEL_TEMPLATES = 1
 PANEL_SETTINGS = 2
 
 
+# 组装三栏布局并协调面板切换与任务选择
 class MainWindow(QMainWindow):
-    """组装三栏布局并协调面板切换与任务选择。"""
-
     device_disconnected = Signal(int)
 
     def __init__(self, device_port=None, parent=None):
@@ -92,8 +91,8 @@ class MainWindow(QMainWindow):
             self._device_monitor.disconnected.connect(self._handle_device_disconnected)
             self._device_monitor.start()
 
+    # 点击活动栏图标：切换面板；点击当前面板图标则收起侧栏
     def _show_panel(self, index):
-        """点击活动栏图标：切换面板；点击当前面板图标则收起侧栏。"""
         if self._panel_visible and index == self._panel_index:
             self._panel_stack.hide()
             self._panel_visible = False
@@ -110,16 +109,16 @@ class MainWindow(QMainWindow):
             self._detail_by_panel.get(index, self.detail_view)
         )
 
+    # 选择任务时刷新任务详情内容
     def _show_task(self, task):
-        """选择任务时刷新任务详情内容。"""
         self.detail_view.set_task(task)
 
+    # 选择模板时刷新放大图，取消选择则显示空状态
     def _show_template(self, path):
-        """选择模板时刷新模板放大图；取消选择则显示空状态。"""
         self.template_view.set_template(path)
 
+    # 手动断开设备前二次确认
     def _confirm_disconnect(self):
-        """手动断开设备前进行二次确认。"""
         answer = QMessageBox.question(
             self,
             "断开设备",
@@ -130,8 +129,8 @@ class MainWindow(QMainWindow):
         if answer == QMessageBox.Yes:
             self._handle_device_disconnected()
 
+    # 统一处理主动断开、监控发现和执行中发现的设备断开
     def _handle_device_disconnected(self, _port=None):
-        """统一处理主动监控和任务执行中发现的设备断开。"""
         if self._disconnecting or self._device_port is None:
             return
         self._disconnecting = True

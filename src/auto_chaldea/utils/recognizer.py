@@ -1,7 +1,8 @@
-import cv2
-import numpy as np
 import subprocess
 from pathlib import Path
+
+import cv2
+import numpy as np
 
 from auto_chaldea.utils.adb_device import DeviceDisconnectedError
 from auto_chaldea.utils.paths import ADB_PATH, TEMPLATE_DIR
@@ -10,8 +11,8 @@ from auto_chaldea.utils.process import hidden_window_kwargs
 DEFAULT_TEMPLATE_SUFFIX = ".png"
 
 
+# 读取模板图像，缺少后缀时默认使用 PNG
 def _load_template(template_dir, template_path):
-    """读取模板图像，缺少后缀时默认使用 PNG。"""
     path = Path(str(template_path))
     if not path.suffix:
         path = path.with_suffix(DEFAULT_TEMPLATE_SUFFIX)
@@ -23,15 +24,15 @@ def _load_template(template_dir, template_path):
     return cv2.imdecode(image_data, cv2.IMREAD_COLOR)
 
 
+# 截取设备屏幕，并按区域裁剪
 def _capture_screen(adb_path, region, device=None):
-    """截取设备屏幕，并按区域裁剪。"""
     cmd = [str(adb_path)]
     if device:
         cmd += ["-s", str(device)]
     cmd += ["exec-out", "screencap", "-p"]
     try:
         res = subprocess.run(
-            cmd, capture_output=True, timeout=15, **hidden_window_kwargs()
+            cmd, check=False, capture_output=True, timeout=15, **hidden_window_kwargs()
         )
     except (OSError, subprocess.TimeoutExpired) as error:
         raise DeviceDisconnectedError("无法读取模拟器屏幕") from error
@@ -53,8 +54,8 @@ def _capture_screen(adb_path, region, device=None):
     return search_area, offset_x, offset_y
 
 
+# 准备模板匹配所需数据：截图 + 模板 + 匹配结果矩阵
 def _prepare_match(template_path, adb_path, template_dir, region, device=None):
-    """准备模板匹配所需的数据。"""
     captured = _capture_screen(adb_path, region, device)
     if captured is None:
         return None
@@ -75,7 +76,7 @@ def _prepare_match(template_path, adb_path, template_dir, region, device=None):
 def _extract_matches(
     res_match, template_width, template_height, offset_x, offset_y, threshold
 ):
-    """提取阈值以上且互不重叠的匹配结果。"""
+    # 提取阈值以上且互不重叠的匹配结果
     matches = []
     while True:
         _, max_val, _, max_loc = cv2.minMaxLoc(res_match)
@@ -107,8 +108,8 @@ def _extract_matches(
     return matches
 
 
+# 判断两个匹配区域是否重叠
 def _rects_overlap(a, b):
-    """判断两个匹配区域是否重叠。"""
     return (
         a["left"] < b["left"] + b["width"]
         and b["left"] < a["left"] + a["width"]
@@ -125,7 +126,7 @@ def find_all_matches(
     threshold=0.7,
     device=None,
 ):
-    """查找模板的全部匹配，并按屏幕位置排序。"""
+    # 查找模板的全部匹配，并按屏幕位置排序
     prepared = _prepare_match(template_path, adb_path, template_dir, region, device)
     if prepared is None:
         return []
@@ -146,7 +147,7 @@ def find_all_matches_multi(
     threshold=0.7,
     device=None,
 ):
-    """在同一张截图中匹配多个模板并返回前 N 个结果。"""
+    # 在同一张截图中匹配多个模板并返回前 N 个结果
     if isinstance(template_paths, str):
         template_paths = [template_paths]
 
@@ -206,7 +207,7 @@ def find_best_match(
     threshold=0.8,
     device=None,
 ):
-    """返回超过阈值的最高置信度结果。"""
+    # 返回超过阈值的最高置信度结果
     prepared = _prepare_match(template_path, adb_path, template_dir, region, device)
     if prepared is None:
         return None
