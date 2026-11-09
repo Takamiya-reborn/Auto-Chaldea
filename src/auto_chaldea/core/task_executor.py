@@ -6,6 +6,7 @@ from auto_chaldea.core.task_schema import normalize_region, valid_steps
 from auto_chaldea.utils.adb_device import click, get_size
 from auto_chaldea.utils.paths import ADB_PATH, TEMPLATE_DIR
 from auto_chaldea.utils.recognizer import find_all_matches, find_all_matches_multi
+from auto_chaldea.utils.screen import get_screen
 
 # 识别不到目标时的默认重试间隔（秒），也是退避的起始间隔
 DEFAULT_RETRY_INTERVAL = 0.2
@@ -130,14 +131,18 @@ def _recognize_with_retry(
     sleep_fn,
     should_stop=None,
     should_skip=None,
+    screen=None,
 ):
     # 反复识别直到出现匹配：超时返回 None，外部请求停止返回空列表，
-    # 请求跳过返回 SKIP_RESULT；识别失败时间隔按倍数退避并封顶
+    # 请求跳过返回 SKIP_RESULT；识别失败时间隔按倍数退避并封顶。
+    # 每轮尝试前强制刷新帧缓存：等待期间画面可能已变化（动画、转场）
     deadline = time.monotonic() + timeout if timeout is not None else None
     interval = retry_interval
     attempts = 0
     while True:
         attempts += 1
+        if screen is not None:
+            screen.invalidate()
         matches = recognize()
         if matches:
             if attempts > 1:
@@ -181,16 +186,31 @@ def execute_step(
     device=None,
     should_stop=None,
     should_skip=None,
+    screen=None,
 ):
     # 执行一步任务，识别失败时按退避间隔重试
     if not isinstance(step, dict):
         raise ValueError(f"Step must be a dict, got {type(step).__name__}")
 
-    recognizer = recognizer_fn or _build_recognizer(adb_path, template_dir, device)
-    multi_recognizer = multi_recognizer_fn or _build_multi_recognizer(
-        adb_path, template_dir, device
+    if screen is None:
+        screen = get_screen(adb_path=adb_path, device=device)
+    # single/none 模式：单个模板，index 默认 0（第一个匹配）
+    index = int(step.get("index") or 0)
+
+    recognizer = recognizer_fn or _build_recognizer(
+        adb_path, template_dir, device, screen, use_roi_cache=index == 0
     )
-    clicker = click_fn or _build_clicker(adb_path, device)
+    multi_recognizer = multi_recognizer_fn or _build_multi_recognizer(
+        adb_path, template_dir, device, screen
+    )
+    raw_clicker = click_fn or _build_clicker(adb_path, device)
+
+    def clicker(x, y):
+        result = raw_clicker(x, y)
+        # 点击会改变画面：立即失效帧缓存，下一步识别强制重新截屏
+        if result and screen is not None:
+            screen.invalidate()
+        return result
 
     # 除 template 外全部字段可省略：mode 默认 single，index 默认 0，region 默认全屏
     mode = str(step.get("mode") or "single").strip().lower()
@@ -291,6 +311,7 @@ def execute_step(
             sleep_fn=sleep_fn,
             should_stop=should_stop,
             should_skip=should_skip,
+            screen=screen,
         )
         if matches == SKIP_RESULT:
             return SKIP_RESULT
@@ -304,9 +325,7 @@ def execute_step(
             sleep_fn(step_interval)
         return result
 
-    # single/none 模式：单个模板，index 默认 0（第一个匹配）
-    index = int(step.get("index") or 0)
-
+    # single/none 模式：index 已在函数开头解析
     action = "recognize only" if mode == "none" else "click"
     print(
         f"[task] step template={template_path}, mode={mode}, action={action}, "
@@ -327,6 +346,7 @@ def execute_step(
         sleep_fn=sleep_fn,
         should_stop=should_stop,
         should_skip=should_skip,
+        screen=screen,
     )
     if matches == SKIP_RESULT:
         return SKIP_RESULT
@@ -355,10 +375,15 @@ def execute_task(
     sleep_fn=time.sleep,
     device=None,
     should_stop=None,
+    screen=None,
 ):
-    # 按顺序执行任务中的有效步骤
+    # 按顺序执行任务中的有效步骤；整个任务共用一个帧来源，
+    # 点击后由执行器失效缓存，保证识别看到的是操作后的画面
     if not isinstance(task, dict):
         raise ValueError(f"Task must be a dict, got {type(task).__name__}")
+
+    if screen is None:
+        screen = get_screen(adb_path=adb_path, device=device)
 
     for step in resolve_steps(valid_steps(task), adb_path=adb_path, device=device):
         if should_stop is not None and should_stop():
@@ -373,23 +398,26 @@ def execute_task(
             sleep_fn=sleep_fn,
             device=device,
             should_stop=should_stop,
+            screen=screen,
         )
         if not result:
             return False
     return True
 
 
-def _build_recognizer(adb_path, template_dir, device=None):
+def _build_recognizer(adb_path, template_dir, device=None, screen=None, use_roi_cache=False):
     return lambda template_path, region: find_all_matches(
         template_path,
         adb_path=adb_path,
         template_dir=template_dir,
         region=region,
         device=device,
+        screen=screen,
+        use_roi_cache=use_roi_cache,
     )
 
 
-def _build_multi_recognizer(adb_path, template_dir, device=None):
+def _build_multi_recognizer(adb_path, template_dir, device=None, screen=None):
     return lambda template_paths, top_n, region: find_all_matches_multi(
         template_paths,
         top_n=top_n,
@@ -397,6 +425,7 @@ def _build_multi_recognizer(adb_path, template_dir, device=None):
         template_dir=template_dir,
         region=region,
         device=device,
+        screen=screen,
     )
 
 

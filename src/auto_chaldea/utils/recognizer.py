@@ -1,12 +1,10 @@
-import subprocess
 from pathlib import Path
 
 import cv2
 import numpy as np
 
-from auto_chaldea.utils.adb_device import DeviceDisconnectedError
 from auto_chaldea.utils.paths import ADB_PATH, TEMPLATE_DIR
-from auto_chaldea.utils.process import hidden_window_kwargs
+from auto_chaldea.utils.screen import get_screen
 
 DEFAULT_TEMPLATE_SUFFIX = ".png"
 
@@ -24,59 +22,25 @@ def _load_template(template_dir, template_path):
     return cv2.imdecode(image_data, cv2.IMREAD_COLOR)
 
 
-# 截取设备屏幕，并按区域裁剪
-def _capture_screen(adb_path, region, device=None):
-    cmd = [str(adb_path)]
-    if device:
-        cmd += ["-s", str(device)]
-    cmd += ["exec-out", "screencap", "-p"]
-    try:
-        res = subprocess.run(
-            cmd, check=False, capture_output=True, timeout=15, **hidden_window_kwargs()
-        )
-    except (OSError, subprocess.TimeoutExpired) as error:
-        raise DeviceDisconnectedError("无法读取模拟器屏幕") from error
-    if res.returncode != 0:
-        raise DeviceDisconnectedError("模拟器已断开")
-
-    img_array = np.frombuffer(res.stdout, dtype=np.uint8)
-    screen = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-    if screen is None:
-        raise DeviceDisconnectedError("无法解析模拟器屏幕")
-
-    search_area = screen
-    offset_x, offset_y = 0, 0
-    if region:
-        x1, y1, x2, y2 = region
-        search_area = screen[y1:y2, x1:x2]
-        offset_x, offset_y = x1, y1
-
-    return search_area, offset_x, offset_y
-
-
-# 准备模板匹配所需数据：截图 + 模板 + 匹配结果矩阵
-def _prepare_match(template_path, adb_path, template_dir, region, device=None):
-    captured = _capture_screen(adb_path, region, device)
-    if captured is None:
-        return None
-    search_area, offset_x, offset_y = captured
-
-    template = _load_template(template_dir, template_path)
-    if template is None:
-        return None
-
+# 在 frame 的 rect 区域 (x1, y1, x2, y2) 内做模板匹配，
+# 返回带全屏坐标的匹配列表
+def _match_in_region(template, frame, rect, threshold):
+    x1, y1, x2, y2 = rect
+    search_area = frame[y1:y2, x1:x2]
     template_height, template_width = template.shape[:2]
     if search_area.shape[0] < template_height or search_area.shape[1] < template_width:
-        return None
+        return []
 
-    match_result = cv2.matchTemplate(search_area, template, cv2.TM_CCOEFF_NORMED)
-    return match_result, template_width, template_height, offset_x, offset_y
+    res_match = cv2.matchTemplate(search_area, template, cv2.TM_CCOEFF_NORMED)
+    return _extract_matches(
+        res_match, template_width, template_height, x1, y1, threshold
+    )
 
 
+# 提取阈值以上且互不重叠的匹配结果（坐标已加回全屏偏移）
 def _extract_matches(
     res_match, template_width, template_height, offset_x, offset_y, threshold
 ):
-    # 提取阈值以上且互不重叠的匹配结果
     matches = []
     while True:
         _, max_val, _, max_loc = cv2.minMaxLoc(res_match)
@@ -108,6 +72,27 @@ def _extract_matches(
     return matches
 
 
+# 命中矩形向外扩一圈模板尺寸作为 ROI 余量，容忍下次出现位置小幅移动
+def _roi_with_margin(match, frame_width, frame_height):
+    margin_x = match["width"]
+    margin_y = match["height"]
+    return (
+        max(0, match["left"] - margin_x),
+        max(0, match["top"] - margin_y),
+        min(frame_width, match["left"] + match["width"] + margin_x),
+        min(frame_height, match["top"] + match["height"] + margin_y),
+    )
+
+
+# 只保留调用方需要的字段并按屏幕位置排序
+def _compact_matches(matches):
+    matches = [
+        {"x": m["x"], "y": m["y"], "confidence": m["confidence"]} for m in matches
+    ]
+    matches.sort(key=lambda m: (m["y"], m["x"]))
+    return matches
+
+
 # 判断两个匹配区域是否重叠
 def _rects_overlap(a, b):
     return (
@@ -118,6 +103,17 @@ def _rects_overlap(a, b):
     )
 
 
+# 区域裁剪到帧范围内，返回 (search_area, offset_x, offset_y)
+def _crop_frame(frame, region):
+    if region is None:
+        return frame, 0, 0
+    x1, y1, x2, y2 = region
+    x1, y1 = max(0, int(x1)), max(0, int(y1))
+    x2 = min(frame.shape[1], int(x2))
+    y2 = min(frame.shape[0], int(y2))
+    return frame[y1:y2, x1:x2], x1, y1
+
+
 def find_all_matches(
     template_path,
     adb_path=ADB_PATH,
@@ -125,17 +121,47 @@ def find_all_matches(
     region=None,
     threshold=0.7,
     device=None,
+    screen=None,
+    use_roi_cache=False,
 ):
-    # 查找模板的全部匹配，并按屏幕位置排序
-    prepared = _prepare_match(template_path, adb_path, template_dir, region, device)
-    if prepared is None:
+    # 查找模板的全部匹配，并按屏幕位置排序。
+    # use_roi_cache 时先在上次命中位置附近小范围搜索（MAA 式 cache），
+    # 未命中再退回全区域搜索；同一帧内两段搜索共用一次截屏
+    if screen is None:
+        screen = get_screen(adb_path=adb_path, device=device)
+
+    template = _load_template(template_dir, template_path)
+    if template is None:
         return []
 
-    res_match, w, h, offset_x, offset_y = prepared
+    frame = screen.capture()
+    frame_width, frame_height = frame.shape[1], frame.shape[0]
+    if region is None:
+        region = (0, 0, frame_width, frame_height)
 
-    matches = _extract_matches(res_match, w, h, offset_x, offset_y, threshold)
-    matches.sort(key=lambda m: (m["y"], m["x"]))
-    return [{"x": m["x"], "y": m["y"], "confidence": m["confidence"]} for m in matches]
+    if use_roi_cache:
+        cached_rect = screen.get_cached_roi(template_path)
+        if cached_rect is not None:
+            x1 = max(cached_rect[0], region[0])
+            y1 = max(cached_rect[1], region[1])
+            x2 = min(cached_rect[2], region[2])
+            y2 = min(cached_rect[3], region[3])
+            if x1 < x2 and y1 < y2:
+                matches = _match_in_region(
+                    template, frame, (x1, y1, x2, y2), threshold
+                )
+                if matches:
+                    screen.set_cached_roi(
+                        template_path, _roi_with_margin(matches[0], frame_width, frame_height)
+                    )
+                    return _compact_matches(matches)
+
+    matches = _match_in_region(template, frame, region, threshold)
+    if use_roi_cache and matches:
+        screen.set_cached_roi(
+            template_path, _roi_with_margin(matches[0], frame_width, frame_height)
+        )
+    return _compact_matches(matches)
 
 
 def find_all_matches_multi(
@@ -146,15 +172,17 @@ def find_all_matches_multi(
     region=None,
     threshold=0.7,
     device=None,
+    screen=None,
 ):
-    # 在同一张截图中匹配多个模板并返回前 N 个结果
+    # 在同一帧截图中匹配多个模板并返回前 N 个结果
     if isinstance(template_paths, str):
         template_paths = [template_paths]
 
-    captured = _capture_screen(adb_path, region, device)
-    if captured is None:
-        return []
-    search_area, offset_x, offset_y = captured
+    if screen is None:
+        screen = get_screen(adb_path=adb_path, device=device)
+
+    frame = screen.capture()
+    search_area, offset_x, offset_y = _crop_frame(frame, region)
 
     candidates = []
     for template_path in template_paths:
@@ -206,13 +234,24 @@ def find_best_match(
     region=None,
     threshold=0.8,
     device=None,
+    screen=None,
 ):
     # 返回超过阈值的最高置信度结果
-    prepared = _prepare_match(template_path, adb_path, template_dir, region, device)
-    if prepared is None:
+    if screen is None:
+        screen = get_screen(adb_path=adb_path, device=device)
+
+    template = _load_template(template_dir, template_path)
+    if template is None:
         return None
 
-    res_match, template_width, template_height, offset_x, offset_y = prepared
+    frame = screen.capture()
+    search_area, offset_x, offset_y = _crop_frame(frame, region)
+
+    template_height, template_width = template.shape[:2]
+    if search_area.shape[0] < template_height or search_area.shape[1] < template_width:
+        return None
+
+    res_match = cv2.matchTemplate(search_area, template, cv2.TM_CCOEFF_NORMED)
     _, max_val, _, max_loc = cv2.minMaxLoc(res_match)
     if max_val < threshold:
         return None
