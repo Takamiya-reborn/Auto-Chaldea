@@ -1,6 +1,5 @@
 from auto_chaldea.core.task_executor import (
     execute_step,
-    execute_task,
     expand_named_steps,
     resolve_steps,
 )
@@ -30,7 +29,6 @@ __all__ = [
     "TEMPLATE_DIR",
     "connect_to_device",
     "execute_step",
-    "execute_task",
     "expand_named_steps",
     "load_tasks",
     "main",

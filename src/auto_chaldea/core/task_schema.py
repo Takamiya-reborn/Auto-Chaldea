@@ -50,24 +50,44 @@ def normalize_region(region):
     return region
 
 
-# 返回包含有效模板名的步骤；图任务（flow 展开后或手写 nodes）把各节点
-# 的子步骤按节点定义顺序拉平，供 UI 表格展示
+# 返回图任务（flow 展开后或手写 nodes）各节点子步骤的有效模板步骤，
+# 按节点定义顺序拉平，供 UI 表格展示
 def valid_steps(task):
     if not isinstance(task, dict):
         return []
-    if task.get("nodes"):
-        steps = []
-        for node in task["nodes"].values():
-            if not isinstance(node, dict):
+    steps = []
+    for node in (task.get("nodes") or {}).values():
+        if not isinstance(node, dict):
+            continue
+        steps.extend(
+            step
+            for step in node.get("steps") or []
+            if isinstance(step, dict) and step.get("template")
+        )
+    return steps
+
+
+# 节点子步骤 → 拉平步骤表的行号映射：{节点名: [每个子步骤对应的表格行号]}。
+# 展开规则与 valid_steps + expand_named_steps 一致（同序过滤、命名坐标点
+# 拆分同样占行），保证运行时子步骤与表格行一一对应，供执行进度高亮使用
+def node_step_rows(task):
+    if not isinstance(task, dict):
+        return {}
+    # 函数级导入避免模块循环（task_executor 依赖本模块的 normalize_region）
+    from auto_chaldea.core.task_executor import expand_named_steps
+
+    rows = {}
+    offset = 0
+    for name, node in (task.get("nodes") or {}).items():
+        if not isinstance(node, dict):
+            continue
+        spans = []
+        for step in node.get("steps") or []:
+            if not isinstance(step, dict) or not step.get("template"):
                 continue
-            steps.extend(
-                step
-                for step in node.get("steps") or []
-                if isinstance(step, dict) and step.get("template")
-            )
-        return steps
-    return [
-        step
-        for step in task.get("steps", [])
-        if isinstance(step, dict) and step.get("template")
-    ]
+            count = len(expand_named_steps([step]))
+            spans.extend(range(offset, offset + count))
+            offset += count
+        if spans:
+            rows[name] = spans
+    return rows

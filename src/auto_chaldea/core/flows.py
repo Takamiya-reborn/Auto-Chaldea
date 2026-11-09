@@ -1,5 +1,5 @@
 # 内置标准流程图：把周回外壳（助战 → 开始 → 战斗 → 结算）沉淀为
-# 代码内置的图模板，任务文件只写每回合脚本。DSL 规则见 README「标准周回 flow」
+# 代码内置的图模板，任务文件只写每回合脚本。DSL 规则见 docs/task-yaml.md「标准周回 flow」
 
 FLOW_STANDARD_FARM = "标准周回"
 
@@ -102,7 +102,7 @@ def _battle_node(position):
     return f"战斗{position}"
 
 
-# 回合脚本条目 → 线性步骤列表（复用 task_executor 的步骤语法）
+# 回合脚本条目 → 节点子步骤列表（复用 task_executor 的步骤语法）
 def _battle_steps(battle):
     if not isinstance(battle, dict):
         raise ValueError(f"Battle entry must be a mapping, got {battle!r}")
@@ -118,16 +118,8 @@ def _battle_steps(battle):
         )
     skills = battle.get("skills") or []
     steps = []
-    for position, skill in enumerate(skills):
-        following = skills[position + 1] if position + 1 < len(skills) else None
-        mode = _center_mode(skill, following)
-        step = _skill_step(skill)
-        if mode == "double":
-            # 第一击触发技能，第二击跳过动画：省掉单独的中央点击
-            step["double"] = True
-        steps.append(step)
-        if mode == "tap":
-            steps.append({"template": "Center"})
+    for skill in skills:
+        steps.extend(_skill_steps(skill))
 
     cards = battle.get("cards")
     if cards:
@@ -171,62 +163,99 @@ def _battle_steps(battle):
     return steps
 
 
-# 技能条目 → 单个点击步骤
-def _skill_step(skill):
-    if isinstance(skill, str):
-        # 简写：字符串视为角色池技能或原始模板路径
-        skill = {"target": skill} if "/" in skill else {"template": skill}
+# 技能条目 → 子步骤列表：本体点击 + 可选 target 子步骤（选目标 + 中央点击）。
+# 技能条目只支持 pool / master / const；target 不是独立条目，而是挂在条目上的子步骤字段
+def _skill_steps(skill):
     if not isinstance(skill, dict):
         raise ValueError(f"Skill entry must be a mapping, got {skill!r}")
 
+    # const：常量基础步骤——无识别的固定点击（命名坐标点等），原样透传，
+    # 不参与动画加速分派
+    if skill.get("const") is not None:
+        value = skill["const"]
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"Skill entry 'const' must be a non-empty value: {skill!r}")
+        return [{"template": value.strip()}]
+
     step = {}
+    master_number = None
     if skill.get("pool") is not None:
         step["template"] = f"技能池/skill_{skill['pool']}"
         # 技能池图标固定在屏幕底部，缺省 region 下；个别技能在左侧时条目覆盖
         step.setdefault("region", "下")
-    elif skill.get("target"):
-        step["template"] = f"角色池/{skill['target']}"
-    elif skill.get("master"):
+    elif skill.get("master") is not None:
+        master_number = _master_number(skill)
         step["template"] = _T_MASTER
-        # 御主技能菜单在右侧
+        # 御主技能图标固定在右侧：单击打开御主菜单
         step.setdefault("region", "右")
-    elif skill.get("template"):
-        step["template"] = skill["template"]
     else:
-        raise ValueError(f"Skill entry needs one of pool/target/master/template: {skill!r}")
+        raise ValueError(
+            f"Skill entry needs 'pool', 'master' or 'const' "
+            f"(target is a sub-step field on the entry): {skill!r}"
+        )
 
     for field in ("index", "region", "threshold"):
         if skill.get(field) is not None:
             step[field] = skill[field]
-    return step
+
+    steps = [step]
+    body = step
+    if master_number is not None:
+        # 技能本体在御主菜单里位置固定：Master<N> 命名坐标点直接点击，
+        # 不走模板识别
+        body = {"template": f"Master{master_number}"}
+        steps.append(body)
+
+    mode = _center_mode(skill)
+    if mode == "double":
+        # 第一击触发技能，第二击加速动画播放：省掉单独的中央点击
+        body["double"] = True
+    if mode == "tap":
+        steps.append({"template": "Center"})
+
+    target = skill.get("target")
+    if target:
+        if not isinstance(target, str) or not target.strip():
+            raise ValueError(
+                f"Skill entry 'target' must be a non-empty name: {skill!r}"
+            )
+        # target 子步骤：单击选目标，动画在选完后才开始播，补中央点击加速播放
+        steps.append({"template": f"角色池/{target.strip()}"})
+        steps.append({"template": "Center"})
+    return steps
 
 
-# 动画跳过方式分派（默认规则见 README「标准周回 flow」）：
-#   "double" — 双击该条目，第二击跳过动画；"tap" — 单击后补屏幕中央点击；
+# master 条目取值校验：只能是御主菜单里的技能序号 1/2/3
+def _master_number(skill):
+    value = skill.get("master")
+    if isinstance(value, bool):
+        raise ValueError(
+            f"Skill entry 'master' must be 1, 2 or 3 (the Nth master skill "
+            f"in the master menu), got {value!r}: {skill!r}"
+        )
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        number = None
+    if number not in (1, 2, 3):
+        raise ValueError(
+            f"Skill entry 'master' must be 1, 2 or 3 (the Nth master skill "
+            f"in the master menu), got {value!r}: {skill!r}"
+        )
+    return number
+
+
+# 动画加速方式分派（默认规则见 docs/task-yaml.md「标准周回 flow」）：
+#   "double" — 双击该条目，第二击加速动画播放；"tap" — 单击后补屏幕中央点击；
 #   "none" — 都不要。显式 center 字段覆盖默认
-def _center_mode(skill, following=None):
-    if not isinstance(skill, dict):
-        # 字符串简写与 _skill_step 同规则：带 / 视为目标头像，否则为原始模板
-        skill = {"target": skill} if "/" in skill else {"template": skill}
+def _center_mode(skill):
     center = skill.get("center")
     if center is None:
-        if skill.get("master"):
-            return "none"
-        if skill.get("target"):
-            return "tap"
-        if _is_target_selection(following):
-            return "none"
-        if skill.get("template"):
-            return "none"
-        return "double"
+        # 带 target 的条目只单击：本体只是打开目标菜单，无动画可加速
+        return "none" if skill.get("target") else "double"
     if center in ("double", "tap", "none"):
         return center
     return "tap" if center else "none"
-
-
-# 下一个条目是否为目标选择（target 条目意味着当前技能需要选目标）
-def _is_target_selection(following):
-    return isinstance(following, dict) and bool(following.get("target"))
 
 
 _FLOWS[FLOW_STANDARD_FARM] = _build_standard_farm

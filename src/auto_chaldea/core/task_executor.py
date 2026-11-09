@@ -2,7 +2,7 @@
 
 import time
 
-from auto_chaldea.core.task_schema import normalize_region, valid_steps
+from auto_chaldea.core.task_schema import normalize_region
 from auto_chaldea.utils.adb_device import click, get_size
 from auto_chaldea.utils.paths import ADB_PATH, TEMPLATE_DIR
 from auto_chaldea.utils.recognizer import find_all_matches, find_all_matches_multi
@@ -16,7 +16,7 @@ DEFAULT_MAX_RETRY_INTERVAL = 3.0
 RETRY_BACKOFF_FACTOR = 2.0
 # 点击成功后、推进到下一步前的默认等待间隔（秒）
 DEFAULT_STEP_INTERVAL = 1.0
-# double: true 时两次点击的间隔（秒）：第一击触发，第二击跳过动画
+# double: true 时两次点击的间隔（秒）：第一击触发，第二击加速动画播放
 DOUBLE_CLICK_INTERVAL = 0.1
 # 超时视为已处理，继续下一步。
 TIMEOUT_RESULT = "timeout"
@@ -33,6 +33,10 @@ NAMED_POINTS = {
     "enemy1": (45, 45),
     "enemy2": (298, 45),
     "enemy3": (545, 45),
+    # 御主菜单里的三个御主技能，横向排列，y 均为 310
+    "master1": (910, 310),
+    "master2": (995, 310),
+    "master3": (1085, 310),
 }
 
 
@@ -124,7 +128,7 @@ def _step_float(step, key, default):
     return default if value in (None, "") else float(value)
 
 
-# 单击 + 可选双击（double: true）：第二击落在动画播放中，用于跳过动画
+# 单击 + 可选双击（double: true）：第二击落在动画播放中，用于加速动画播放
 def _click_maybe_double(clicker, x, y, step, sleep_fn):
     result = clicker(int(x), int(y))
     if result and step.get("double"):
@@ -374,46 +378,6 @@ def execute_step(
     if result and step_interval:
         sleep_fn(step_interval)
     return result
-
-
-def execute_task(
-    task,
-    adb_path=ADB_PATH,
-    template_dir=TEMPLATE_DIR,
-    recognizer_fn=None,
-    multi_recognizer_fn=None,
-    click_fn=None,
-    sleep_fn=time.sleep,
-    device=None,
-    should_stop=None,
-    screen=None,
-):
-    # 按顺序执行任务中的有效步骤；整个任务共用一个帧来源，
-    # 点击后由执行器失效缓存，保证识别看到的是操作后的画面
-    if not isinstance(task, dict):
-        raise ValueError(f"Task must be a dict, got {type(task).__name__}")
-
-    if screen is None:
-        screen = get_screen(adb_path=adb_path, device=device)
-
-    for step in resolve_steps(valid_steps(task), adb_path=adb_path, device=device):
-        if should_stop is not None and should_stop():
-            return False
-        result = execute_step(
-            step,
-            adb_path=adb_path,
-            template_dir=template_dir,
-            recognizer_fn=recognizer_fn,
-            multi_recognizer_fn=multi_recognizer_fn,
-            click_fn=click_fn,
-            sleep_fn=sleep_fn,
-            device=device,
-            should_stop=should_stop,
-            screen=screen,
-        )
-        if not result:
-            return False
-    return True
 
 
 def _build_recognizer(

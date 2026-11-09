@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from auto_chaldea.core.task_executor import expand_named_steps
-from auto_chaldea.core.task_schema import valid_steps
+from auto_chaldea.core.task_schema import node_step_rows, valid_steps
 from auto_chaldea.ui.common.icons import (
     next_icon,
     pause_icon,
@@ -44,6 +44,8 @@ class TaskDetailView(QWidget):
         self._worker = None
         self._execution_total = 0
         self._execution_current = 0
+        # 节点子步骤 → 表格行号映射，执行进度高亮用
+        self._step_rows = {}
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -174,6 +176,7 @@ class TaskDetailView(QWidget):
         self._execution_current = 0
 
         if task is None:
+            self._step_rows = {}
             self._stack.setCurrentIndex(0)
             return
 
@@ -188,6 +191,7 @@ class TaskDetailView(QWidget):
         self._desc_label.setVisible(bool(prerequisite))
 
         self._table.set_steps(steps)
+        self._step_rows = node_step_rows(task)
         self._stack.setCurrentIndex(1)
 
     # 窗口关闭前停止后台任务并断开 ADB 连接
@@ -219,8 +223,8 @@ class TaskDetailView(QWidget):
             return
         for signal in (
             worker.execution_started,
-            worker.step_started,
-            worker.step_finished,
+            worker.node_step,
+            worker.skip_consumed,
             worker.device_disconnected,
             worker.log_message,
             worker.finished_run,
@@ -265,8 +269,8 @@ class TaskDetailView(QWidget):
         self._execution_current = 1
         self._worker = TaskWorker(self._task, port or None, execution_total)
         self._worker.execution_started.connect(self._on_execution_started)
-        self._worker.step_started.connect(self._on_step_started)
-        self._worker.step_finished.connect(self._on_step_finished)
+        self._worker.node_step.connect(self._on_node_step)
+        self._worker.skip_consumed.connect(self._on_skip_consumed)
         self._worker.device_disconnected.connect(self._on_device_disconnected)
         self._worker.log_message.connect(
             lambda message: self._set_status(message, FGO["gold_text"])
@@ -304,11 +308,10 @@ class TaskDetailView(QWidget):
         self._worker.skip_step()
         self._set_status("正在跳过当前步骤…", FGO["attention"])
 
-    def _on_step_started(self, position):
-        total = self._table.rowCount()
-        self._table.set_running_row(position)
-        self._table.set_result(position, "运行中", FGO["gold_deep"])
-        self._set_status(f"运行中 · 步骤 {position + 1}/{total}", FGO["accent"])
+    # 跳过请求已被执行端消费（图已推进或子步骤已跳过）：刷新状态栏，
+    # 否则"正在跳过…"会一直停留到下一次状态变化
+    def _on_skip_consumed(self):
+        self._set_status("运行中", FGO["accent"])
 
     def _on_execution_started(self, execution):
         # 每一轮开始前清空上一轮的结果，避免多次执行时旧状态覆盖堆积
@@ -316,15 +319,24 @@ class TaskDetailView(QWidget):
         self._table.clear_results()
         self._set_status("运行中", FGO["accent"])
 
-    def _on_step_finished(self, position, result):
-        if result == "timeout":
-            self._table.set_result(position, "超时", FGO["timeout"])
-        elif result == "skipped":
-            self._table.set_result(position, "已跳过", FGO["attention"])
-        elif result == "executed":
-            self._table.set_result(position, "已执行", FGO["success"])
+    # 图执行进度 → 表格行：节点子步骤按映射找到行，高亮运行中的行并
+    # 写入结果列；无子步骤的节点（选助战、结算等）不产生行事件
+    def _on_node_step(self, node, position, status):
+        rows = self._step_rows.get(node)
+        if not rows or not 0 <= position < len(rows):
+            return
+        row = rows[position]
+        if status == "running":
+            self._table.set_running_row(row)
+            self._table.set_result(row, "运行中", FGO["gold_deep"])
+        elif status == "timeout":
+            self._table.set_result(row, "超时", FGO["timeout"])
+        elif status == "skipped":
+            self._table.set_result(row, "已跳过", FGO["attention"])
+        elif status == "executed":
+            self._table.set_result(row, "已执行", FGO["success"])
         else:
-            self._table.set_result(position, "未匹配", FGO["danger"])
+            self._table.set_result(row, "未匹配", FGO["danger"])
 
     def _on_device_disconnected(self):
         port = self._port_edit.text().strip()

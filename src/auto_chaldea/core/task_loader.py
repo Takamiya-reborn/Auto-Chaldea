@@ -18,7 +18,8 @@ def load_task_files(task_dir=None):
     return list(_iter_task_files(base_dir))
 
 
-# 按需加载单个任务文件，解析失败时返回 None
+# 按需加载单个任务文件，解析失败时返回 None。
+# 任务必须是图（手写 nodes 或 flow 展开得到），没有 'nodes' 的文件会被跳过
 def load_task_file(task_path):
     try:
         with Path(task_path).open("r", encoding="utf-8") as file:
@@ -29,24 +30,22 @@ def load_task_file(task_path):
         return None
     # flow 任务在此统一展开为图任务，UI 与执行器拿到的都是展开后的形态
     try:
-        return expand_flow(task)
+        task = expand_flow(task)
     except ValueError as error:
         print(f"[task] flow expansion failed: {error}")
         return None
+    if not task.get("nodes"):
+        print(
+            f"[task] {Path(task_path).name}: no 'nodes' after flow expansion; "
+            f"only graph tasks are supported, skipped"
+        )
+        return None
+    return task
 
 
 def _iter_task_files(base_dir):
     yaml_files = sorted([*base_dir.rglob("*.yaml"), *base_dir.rglob("*.yml")])
     for yaml_path in yaml_files:
-        try:
-            with yaml_path.open("r", encoding="utf-8") as file:
-                task = yaml.safe_load(file)
-        except (OSError, yaml.YAMLError):
-            continue
-        if isinstance(task, dict):
-            try:
-                task = expand_flow(task)
-            except ValueError as error:
-                print(f"[task] flow expansion failed: {error}")
-                continue
+        task = load_task_file(yaml_path)
+        if task is not None:
             yield yaml_path.relative_to(base_dir).with_suffix("").as_posix(), task

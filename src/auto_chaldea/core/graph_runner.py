@@ -1,5 +1,5 @@
-# 画面图运行器：节点 = 一个画面（识别 + 动作），next = 有序候选列表。
-# 节点字段与路由规则见 README「画面图任务」一节
+# 节点图运行器：节点 = 一个画面（识别 + 动作），next = 有序候选列表。
+# 节点字段与路由规则见 docs/task-yaml.md「节点图任务」一节
 
 import time
 
@@ -89,6 +89,7 @@ def execute_graph(
     should_skip=None,
     screen=None,
     click_fn=None,
+    progress=None,
 ):
     # 沿任务图行走：每轮访问取一帧截图，按序尝试候选节点，命中即执行其动作
     if not isinstance(task, dict):
@@ -149,6 +150,7 @@ def execute_graph(
             clicker=clicker,
             fixed_clicks=fixed_clicks,
             resolved_steps=resolved_steps,
+            progress=progress,
         )
         if outcome is None:
             # 等待超时且无法自救：图失败
@@ -174,9 +176,10 @@ def _visit(
     clicker,
     fixed_clicks,
     resolved_steps,
+    progress=None,
 ):
     # 候选中声明了 timeout 的节点构成可选等待期限：超时视为已处理，
-    # 取第一个可选节点直接前往其 next（与线性 timeout 语义一致）
+    # 取第一个可选节点直接前往其 next
     deadlines = [
         float(nodes[name]["timeout"])
         for name in pending
@@ -202,9 +205,12 @@ def _visit(
             print(f"[graph] aborted while waiting for {pending}")
             return None
         if should_skip is not None and should_skip():
-            # 跳过 = 推进图：与超时同路（可选节点优先，否则走自救边）
+            # 跳过 = 推进图：与超时同路（可选节点优先，否则走自救边）；
+            # 都没有时兜底前往第一个候选的 next——用户跳过只推进，不终止任务
             print(f"[graph] skip requested while waiting for {pending}")
-            routed = _route_on_timeout(pending, nodes)
+            routed = _route_on_timeout(pending, nodes) or _route_on_skip(
+                pending, nodes
+            )
             if routed is not None:
                 return routed
             print(f"[graph] skip with no route available from {pending}")
@@ -237,6 +243,7 @@ def _visit(
         clicker=clicker,
         fixed_clicks=fixed_clicks,
         resolved_steps=resolved_steps,
+        progress=progress,
     )
 
 
@@ -297,6 +304,20 @@ def _route_on_timeout(pending, nodes):
     return None
 
 
+# 用户跳过且无可选节点与自救边时的兜底：视为第一个有出边的候选已被
+# 手动处理，直接前往其 next——保证"下一步"始终推进图而不终止任务
+def _route_on_skip(pending, nodes):
+    for name in pending:
+        nxt = nodes[name].get("next") or []
+        if nxt:
+            print(
+                f"[graph] skip fallback: treating {name!r} as handled, "
+                f"continuing to {nxt}"
+            )
+            return list(nxt)
+    return None
+
+
 # 执行命中节点：前置等待 → 动作（点击/命名点/子步骤）→ 后置等待 → 路由。
 # 返回下一候选列表；无法推进时返回 None
 def _run_node(
@@ -314,6 +335,7 @@ def _run_node(
     clicker,
     fixed_clicks,
     resolved_steps,
+    progress=None,
 ):
     # 已达 max_times 的超限命中：不执行动作，直接走超限路由
     if exceeded:
@@ -347,6 +369,10 @@ def _run_node(
     for position, step in enumerate(steps):
         if should_stop is not None and should_stop():
             return None
+        # 进度回报：子步骤开始前 "running"，结束后归一为
+        # executed / failed / skipped / timeout，供界面高亮对应表格行
+        if progress is not None:
+            progress(name, position, "running")
         result = execute_step(
             step,
             adb_path=adb_path,
@@ -358,8 +384,18 @@ def _run_node(
             screen=screen,
             click_fn=clicker,
         )
+        if progress is not None:
+            if result == SKIP_RESULT:
+                status = "skipped"
+            elif result == TIMEOUT_RESULT:
+                status = "timeout"
+            elif result:
+                status = "executed"
+            else:
+                status = "failed"
+            progress(name, position, status)
         if result in (SKIP_RESULT, TIMEOUT_RESULT):
-            # 与线性语义一致：skip / timeout 视为已处理，继续子步骤
+            # skip / timeout 视为已处理，继续子步骤
             continue
         if not result:
             print(f"[graph] node {name!r} step {position + 1} failed")

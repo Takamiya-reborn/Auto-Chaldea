@@ -98,7 +98,10 @@ def double_click(x, y, interval=0.1, adb_path=ADB_PATH, device=None):
     return first_result and second_result
 
 
-# 读取设备屏幕尺寸
+# 读取设备屏幕尺寸，返回 (宽, 高)。
+# 模拟器常按自然方向上报竖屏尺寸（如 720x1280），而游戏画面与截屏、
+# 点击坐标都是横屏（如 1280x720）：宽小于高时交换宽高，保证命名
+# 坐标点缩放与模板识别处于同一坐标系
 def get_size(adb_path=ADB_PATH, device=None):
     command = _device_command(adb_path, device, "shell", "wm", "size")
     try:
@@ -122,7 +125,10 @@ def get_size(adb_path=ADB_PATH, device=None):
         match = re.search(r"Physical size:\s*(\d+)x(\d+)", result.stdout or "")
     if match is None:
         raise DeviceDisconnectedError("无法读取模拟器屏幕尺寸")
-    return int(match.group(1)), int(match.group(2))
+    width, height = int(match.group(1)), int(match.group(2))
+    if width < height:
+        width, height = height, width
+    return width, height
 
 
 def _device_address(port):

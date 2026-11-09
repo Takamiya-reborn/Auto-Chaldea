@@ -11,9 +11,13 @@ from PySide6.QtWidgets import QAbstractScrollArea, QHBoxLayout, QScrollBar, QWid
 _GOLD = "#dac254"
 _TOP = "#ffffff"
 _BOTTOM = "#e3ddc8"
-_THICKNESS = 12  # 滚动条粗细
+_TRACK = "#3c3c3c"  # 轨道背景色（半透明灰）
+_THICKNESS = 20  # 滚动条粗细
 _MIN_LENGTH = 30  # 手柄最短长度
 _TIP = 9  # 六边形尖端长度
+_MARGIN = 1  # 手柄留白
+_PROTRUDE = 3  # 手柄单侧超出轨道的量，制造层次感
+_TRACK_ALPHA = 128  # 轨道不透明度（50%）
 
 
 class HexScrollBar(QScrollBar):
@@ -28,10 +32,26 @@ class HexScrollBar(QScrollBar):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         if self.maximum() > self.minimum():
+            self._draw_track(painter)
             self._draw_handle(painter)
         painter.end()
 
-    # 轨道透明，只画手柄；不可用时整体压暗
+    # 半透明灰色方形轨道，比手柄窄，让手柄凸出来
+    def _draw_track(self, painter):
+        vertical = self.orientation() == Qt.Vertical
+        track = self.height() if vertical else self.width()
+        cross = self.width() if vertical else self.height()
+
+        color = QColor(_TRACK)
+        color.setAlpha(_TRACK_ALPHA)
+        width = max(4, cross - 2 * _PROTRUDE)
+        pos = round((cross - width) / 2)
+        if vertical:
+            painter.fillRect(pos, 0, width, track, color)
+        else:
+            painter.fillRect(0, pos, track, width, color)
+
+    # 六边形手柄横跨整个控件宽度，两侧盖在轨道上；不可用时整体压暗
     def _draw_handle(self, painter):
         vertical = self.orientation() == Qt.Vertical
         track = self.height() if vertical else self.width()
@@ -42,7 +62,7 @@ class HexScrollBar(QScrollBar):
         travel = track - length
         offset = round(travel * self.value() / span) if span > 0 else 0
 
-        margin = 2
+        margin = _MARGIN
         tip = min(_TIP, max(5, length * 0.22))
         body = length - 2 * tip
 
