@@ -202,6 +202,29 @@ QDialog#connectDialog {
         stop:0.6 #50708f, stop:0.7 #4b7395, stop:0.8 #47769c,
         stop:0.9 #4279a0, stop:1 #3d76a2);
 }
+/* ==== 执行次数对话框 ==== */
+QDialog#runCountDialog {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #7ba9ba, stop:0.1 #719bb0, stop:0.2 #688ea6,
+        stop:0.3 #60839c, stop:0.4 #597994, stop:0.5 #54718d,
+        stop:0.6 #50708f, stop:0.7 #4b7395, stop:0.8 #47769c,
+        stop:0.9 #4279a0, stop:1 #3d76a2);
+}
+QLineEdit#countValue {
+    font-size: 32px;
+    font-weight: 800;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 6px;
+    padding: 2px 4px;
+    selection-background-color: #b8935a;
+}
+QLineEdit#countValue:focus { border: 1px solid #d4b06a; }
+QPushButton#stepperButton {
+    font-size: 22px;
+    font-weight: 800;
+    padding: 2px;
+}
 /* ==== 滚动条 / 分割线 ==== */
 /* 滚动条由 HexScrollBar 全自绘（透明轨道 + 六边形手柄），不走 QSS */
 QSplitter::handle { background-color: rgba(255, 255, 255, 0.4); }

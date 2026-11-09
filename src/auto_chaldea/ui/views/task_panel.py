@@ -15,14 +15,11 @@ from PySide6.QtWidgets import (
 from auto_chaldea.core.task_loader import load_task_file
 from auto_chaldea.ui.common.icons import dir_node_icon, refresh_icon, task_node_icon
 from auto_chaldea.ui.common.theme import FGO
-from auto_chaldea.ui.widgets.hex_scrollbar import ScrollBox
-from auto_chaldea.ui.widgets.outlined_label import OutlinedLabel
 from auto_chaldea.ui.widgets.card_tree import (
     VIEWPORT_MARGINS as _VIEWPORT_MARGINS,
 )
 from auto_chaldea.ui.widgets.card_tree import (
     CardTreeWidget,
-    FastTreeStyle,
 )
 from auto_chaldea.ui.widgets.card_tree import (
     open_directory as _open_directory,
@@ -30,6 +27,8 @@ from auto_chaldea.ui.widgets.card_tree import (
 from auto_chaldea.ui.widgets.card_tree import (
     reveal_file as _reveal_file,
 )
+from auto_chaldea.ui.widgets.hex_scrollbar import ScrollBox
+from auto_chaldea.ui.widgets.outlined_label import OutlinedLabel
 from auto_chaldea.utils.paths import TASK_DIR
 
 
@@ -71,7 +70,6 @@ class TaskPanel(QWidget):
         self._tree.setTextElideMode(Qt.ElideRight)
         self._tree.setUniformRowHeights(True)
         self._tree.setViewportMargins(*_VIEWPORT_MARGINS)
-        self._tree.setStyle(FastTreeStyle(self._tree.style()))
         self._tree.setAnimated(True)  # 展开 / 收起时的滑动动画
         self._tree.setExpandsOnDoubleClick(False)  # 展开收起统一由单击触发
         self._tree.setContextMenuPolicy(Qt.CustomContextMenu)

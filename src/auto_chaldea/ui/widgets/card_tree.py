@@ -7,12 +7,19 @@ from PySide6.QtCore import QEvent, QModelIndex, QPersistentModelIndex, QRectF, Q
 from PySide6.QtGui import (
     QColor,
     QDesktopServices,
+    QIcon,
     QLinearGradient,
     QPainter,
     QPalette,
     QPen,
 )
-from PySide6.QtWidgets import QProxyStyle, QStyle, QTreeWidget
+from PySide6.QtWidgets import (
+    QApplication,
+    QStyle,
+    QStyleOptionViewItem,
+    QStyledItemDelegate,
+    QTreeWidget,
+)
 
 from auto_chaldea.ui.common.theme import FGO
 from auto_chaldea.ui.widgets.hex_scrollbar import install_hex_scrollbars
@@ -21,12 +28,45 @@ from auto_chaldea.ui.widgets.hex_scrollbar import install_hex_scrollbars
 VIEWPORT_MARGINS = (8, 6, 8, 8)
 
 
-# 缩短树展开 / 收起动画时长
-class FastTreeStyle(QProxyStyle):
-    def styleHint(self, hint, option=None, widget=None, returnData=None):
-        if hint == self.StyleHint.SH_Widget_Animation_Duration:
-            return 120
-        return super().styleHint(hint, option, widget, returnData)
+# 行内容委托：只画图标与文字，绝不画任何样式底色。
+# Fusion / QSS 会以"带透明度的 Highlight"填充条目矩形——若 Highlight 配成
+# 透明黑，点击行后就表现为卡片上的灰色遮罩。这里直接跳过全部背景原语，
+# 从根上杜绝该类填充；几何沿用样式自身的 subElementRect，保证与原版一致。
+#
+# 注意：CardTreeWidget 不能再挂 QProxyStyle（如曾经的 FastTreeStyle）——
+# PySide6 6.11.2 下"代理样式 + Python 重写的 paint"组合会触发原生段错误；
+# 动画时长已由 app 级 _AnimationProxyStyle 全局收紧，树级无需重复设置。
+class CardRowDelegate(QStyledItemDelegate):
+    def paint(self, painter, option, index):
+        # 原生 paint 流程里 initStyleOption 由 Qt 内部先调用，从模型填
+        # text / icon / font / palette；这里自绘必须显式补上，否则全空。
+        opt = QStyleOptionViewItem(option)
+        self.initStyleOption(opt, index)
+        widget = opt.widget
+        style = widget.style() if widget is not None else QApplication.style()
+        enabled = bool(opt.state & QStyle.State_Enabled)
+        # 图标
+        icon = opt.icon
+        if not icon.isNull():
+            deco = style.subElementRect(QStyle.SE_ItemViewItemDecoration, opt, widget)
+            if deco.isValid():
+                mode = QIcon.Normal if enabled else QIcon.Disabled
+                state = QIcon.On if opt.state & QStyle.State_Open else QIcon.Off
+                icon.paint(painter, deco, Qt.AlignCenter, mode, state)
+        # 文字（超宽省略，禁用行用禁用色）
+        text = opt.text
+        if text:
+            text_rect = style.subElementRect(QStyle.SE_ItemViewItemText, opt, widget)
+            if text_rect.isValid():
+                fm = opt.fontMetrics
+                elided = fm.elidedText(text, Qt.ElideRight, text_rect.width())
+                group = QPalette.Normal if enabled else QPalette.Disabled
+                painter.save()
+                painter.setFont(opt.font)
+                painter.setPen(opt.palette.color(group, QPalette.Text))
+                flags = (opt.displayAlignment & ~Qt.AlignVertical_Mask) | Qt.AlignVCenter
+                painter.drawText(text_rect, flags, elided)
+                painter.restore()
 
 
 # 卡片式树：每行为常驻金边的奶油卡片，整行自绘并随层级缩进；
@@ -35,12 +75,15 @@ class CardTreeWidget(QTreeWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         install_hex_scrollbars(self)
+        self.setItemDelegate(CardRowDelegate(self))
         self._hover_index = QPersistentModelIndex()
         # Qt 会在选中行（含缩进槽）上用调色板 Highlight 再画一层底色，
-        # 盖掉卡片金边（表现为选中后边框"消失"）；置为透明后该底色不可见。
+        # 盖掉卡片金边（表现为选中后边框"消失"）；且 Fusion 会以带透明度的
+        # Highlight 填充条目矩形——置为透明黑会表现为点击后的灰色遮罩，
+        # 故改为奶油色：无论样式何时叠这层填充，都是奶油底上画奶油，不可见。
         # 选中行文字也会被换成 HighlightedText，需配回奶油底上的深色
         palette = self.palette()
-        palette.setColor(QPalette.Highlight, QColor(0, 0, 0, 0))
+        palette.setColor(QPalette.Highlight, QColor(FGO["cream_selected_bottom"]))
         palette.setColor(QPalette.HighlightedText, QColor(FGO["text_on_cream"]))
         self.setPalette(palette)
         # 视口默认不接收悬停事件，打开后才能跟踪悬停行
@@ -139,8 +182,14 @@ class CardTreeWidget(QTreeWidget):
             painter.drawRoundedRect(card, 6, 6)
             painter.restore()
 
-        # 选中 / 悬停底色已剥离，这里只画文字和图标
-        super().drawRow(painter, option, index)
+        # 内容交给 CardRowDelegate：只画图标与文字。不再调用
+        # QTreeView::drawRow——它会让样式以"带透明度的 Highlight"填充行
+        # 矩形（Highlight 配透明黑时表现为点击后的灰色遮罩），彻底绕开。
+        # 委托的 rect 必须用 visualRect（已含层级缩进）：原生 drawRow 内部
+        # 会按深度调整委托矩形，绕开后需自行补偿，否则文字不随卡片缩进。
+        opt = QStyleOptionViewItem(option)
+        opt.rect = self.visualRect(index)
+        self.itemDelegate().paint(painter, opt, index)
 
 
 def open_directory(path):

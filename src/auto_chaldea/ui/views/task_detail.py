@@ -4,7 +4,6 @@ from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtGui import QIntValidator
 from PySide6.QtWidgets import (
     QHBoxLayout,
-    QInputDialog,
     QLabel,
     QLineEdit,
     QPushButton,
@@ -25,6 +24,7 @@ from auto_chaldea.ui.common.icons import (
 )
 from auto_chaldea.ui.common.theme import FGO
 from auto_chaldea.ui.runtime.worker import TaskWorker
+from auto_chaldea.ui.views.run_count_dialog import ExecutionCountDialog
 from auto_chaldea.ui.widgets.hex_scrollbar import ScrollBox
 from auto_chaldea.ui.widgets.outlined_label import OutlinedLabel
 from auto_chaldea.ui.widgets.task_table import TaskStepTable
@@ -242,17 +242,10 @@ class TaskDetailView(QWidget):
             self._set_status("任务没有可执行的步骤", FGO["attention"])
             return
 
-        execution_total, accepted = QInputDialog.getInt(
-            self,
-            "执行次数",
-            "请输入执行次数：",
-            1,
-            1,
-            9999,
-            1,
-        )
-        if not accepted:
+        dialog = ExecutionCountDialog(parent=self)
+        if dialog.exec() != ExecutionCountDialog.Accepted:
             return
+        execution_total = dialog.value()
 
         port = self._port_edit.text().strip()
         if port:

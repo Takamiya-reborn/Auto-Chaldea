@@ -4,9 +4,9 @@ import sys
 
 from PySide6.QtWidgets import QApplication
 
-from auto_chaldea.ui.views.connect_dialog import ConnectDialog
-from auto_chaldea.ui.main_window import MainWindow
 from auto_chaldea.ui.common.theme import apply_theme
+from auto_chaldea.ui.main_window import MainWindow
+from auto_chaldea.ui.views.connect_dialog import ConnectDialog
 
 
 # 启动图形界面：先连接设备，断开后回到连接页支持重连
@@ -40,4 +40,4 @@ def main():
         reconnect_port = disconnected_port[0]
 
 
-__all__ = ["main", "MainWindow", "ConnectDialog"]
+__all__ = ["ConnectDialog", "MainWindow", "main"]

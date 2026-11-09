@@ -16,15 +16,14 @@ from PySide6.QtWidgets import (
 
 from auto_chaldea.ui.common.icons import dir_node_icon, refresh_icon
 from auto_chaldea.ui.common.theme import FGO
-from auto_chaldea.ui.widgets.hex_scrollbar import ScrollBox
-from auto_chaldea.ui.widgets.outlined_label import OutlinedLabel
 from auto_chaldea.ui.widgets.card_tree import (
     VIEWPORT_MARGINS,
     CardTreeWidget,
-    FastTreeStyle,
     open_directory,
     reveal_file,
 )
+from auto_chaldea.ui.widgets.hex_scrollbar import ScrollBox
+from auto_chaldea.ui.widgets.outlined_label import OutlinedLabel
 from auto_chaldea.utils.paths import TEMPLATE_DIR
 
 _PREVIEW_MARGIN = 16  # 预览图四周留白
@@ -115,7 +114,6 @@ class TemplatesPanel(QWidget):
         self._tree.setTextElideMode(Qt.ElideRight)
         self._tree.setUniformRowHeights(True)
         self._tree.setViewportMargins(*VIEWPORT_MARGINS)
-        self._tree.setStyle(FastTreeStyle(self._tree.style()))
         self._tree.setAnimated(True)
         self._tree.setExpandsOnDoubleClick(False)
         self._tree.setContextMenuPolicy(Qt.CustomContextMenu)
