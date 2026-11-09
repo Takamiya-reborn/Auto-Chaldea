@@ -16,6 +16,8 @@ DEFAULT_MAX_RETRY_INTERVAL = 3.0
 RETRY_BACKOFF_FACTOR = 2.0
 # 点击成功后、推进到下一步前的默认等待间隔（秒）
 DEFAULT_STEP_INTERVAL = 1.0
+# double: true 时两次点击的间隔（秒）：第一击触发，第二击跳过动画
+DOUBLE_CLICK_INTERVAL = 0.1
 # 超时视为已处理，继续下一步。
 TIMEOUT_RESULT = "timeout"
 # 手动跳过当前步骤，继续下一步。
@@ -120,6 +122,15 @@ def _split_named_points(template_path):
 def _step_float(step, key, default):
     value = step.get(key)
     return default if value in (None, "") else float(value)
+
+
+# 单击 + 可选双击（double: true）：第二击落在动画播放中，用于跳过动画
+def _click_maybe_double(clicker, x, y, step, sleep_fn):
+    result = clicker(int(x), int(y))
+    if result and step.get("double"):
+        sleep_fn(DOUBLE_CLICK_INTERVAL)
+        result = clicker(int(x), int(y)) or result
+    return result
 
 
 def _recognize_with_retry(
@@ -268,7 +279,7 @@ def execute_step(
         x, y = int(click_target[0]), int(click_target[1])
         label = f"template={template_path}, " if template_path else ""
         print(f"[task] step {label}click=({x}, {y})")
-        result = clicker(x, y)
+        result = _click_maybe_double(clicker, x, y, step, sleep_fn)
         if result and step_interval:
             sleep_fn(step_interval)
         return result
@@ -359,7 +370,7 @@ def execute_step(
     result = False
     if len(matches) > index:
         target = matches[index]
-        result = clicker(target["x"], target["y"])
+        result = _click_maybe_double(clicker, target["x"], target["y"], step, sleep_fn)
     if result and step_interval:
         sleep_fn(step_interval)
     return result
@@ -405,7 +416,9 @@ def execute_task(
     return True
 
 
-def _build_recognizer(adb_path, template_dir, device=None, screen=None, use_roi_cache=False):
+def _build_recognizer(
+    adb_path, template_dir, device=None, screen=None, use_roi_cache=False
+):
     return lambda template_path, region: find_all_matches(
         template_path,
         adb_path=adb_path,

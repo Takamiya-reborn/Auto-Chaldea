@@ -1,0 +1,39 @@
+task_name: 日常虐菜Pro
+prerequisite: 1号位所长，2号位摩根，三号位杀狐，御主穿CD服
+flow: 标准周回
+turns:
+  1:
+    skills:
+      - pool: 2
+      - pool: 3
+        index: 1
+      - target: 奥尔加玛丽/1
+    cards:
+      - np: 既已过去的人理之终
+      - [buster, arts, quick]
+      - [buster, arts, quick]
+  2:
+    skills:
+      - pool: 1
+      - pool: 5
+      - pool: 2
+        index: 0
+      - target: 摩根/冬之女王
+      - pool: 2
+      - target: 奥尔加玛丽/1
+      - pool: 4
+      - target: 奥尔加玛丽/1
+      - master: true
+      - pool: 1
+      - target: 奥尔加玛丽/1
+      - pool: 2
+      - pool: 3
+    cards: [buster, quick, arts]
+  3:
+    skills:
+      - pool: 1
+        region: 左下
+    cards:
+      - np: 既已过去的人理之终
+      - buster
+      - buster

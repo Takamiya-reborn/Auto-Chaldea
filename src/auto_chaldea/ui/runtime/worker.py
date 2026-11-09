@@ -5,6 +5,7 @@ import time
 
 from PySide6.QtCore import QThread, Signal
 
+from auto_chaldea.core.graph_runner import execute_graph
 from auto_chaldea.core.task_executor import (
     SKIP_RESULT,
     TIMEOUT_RESULT,
@@ -84,6 +85,42 @@ class TaskWorker(QThread):
 
     # ---- 线程主体 ----
 
+    # 画面图任务执行：每次执行跑一遍图，节点进度通过日志投递到界面
+    def _run_graph(self, device):
+        completed = True
+        try:
+            for execution in range(1, self._execution_total + 1):
+                if self._stop_requested.is_set():
+                    break
+                self.execution_started.emit(execution)
+                self._skip_requested.clear()
+                self._wait_while_paused()
+                if self._stop_requested.is_set():
+                    break
+                result = execute_graph(
+                    self._task,
+                    adb_path=ADB_PATH,
+                    template_dir=TEMPLATE_DIR,
+                    device=device,
+                    sleep_fn=self._interruptible_sleep,
+                    should_stop=self._stop_requested.is_set,
+                    should_skip=self._skip_requested.is_set,
+                )
+                if result is False:
+                    self.log_message.emit(
+                        f"第 {execution} 次执行未走完任务图（等待超时或步骤失败），任务终止。"
+                    )
+                    completed = False
+                    break
+            self.finished_run.emit(completed and not self._stop_requested.is_set())
+        except DeviceDisconnectedError as error:
+            self.log_message.emit(f"模拟器已断开：{error}")
+            self.device_disconnected.emit()
+            self.finished_run.emit(False)
+        except Exception as error:  # noqa: BLE001 - 后台线程需要兜底并回报界面
+            self.log_message.emit(f"任务异常终止：{error}")
+            self.finished_run.emit(False)
+
     def run(self):
         try:
             if self._port:
@@ -97,6 +134,10 @@ class TaskWorker(QThread):
 
             steps = valid_steps(self._task)
             device = f"127.0.0.1:{self._port}" if self._port else None
+            # 画面图任务：节点图模式执行，与线性步骤互不影响
+            if self._task.get("nodes"):
+                self._run_graph(device)
+                return
             # 设备连接成功后再解析：命名坐标点（Center、Enemy1 等）需要屏幕尺寸换算
             steps = resolve_steps(steps, adb_path=ADB_PATH, device=device)
             completed = True

@@ -50,7 +50,24 @@ def normalize_region(region):
     return region
 
 
-# 返回包含有效模板名的步骤
+# 返回包含有效模板名的步骤；图任务（flow 展开后或手写 nodes）把各节点
+# 的子步骤按节点定义顺序拉平，供 UI 表格展示
 def valid_steps(task):
-    steps = task.get("steps", []) if isinstance(task, dict) else []
-    return [step for step in steps if isinstance(step, dict) and step.get("template")]
+    if not isinstance(task, dict):
+        return []
+    if task.get("nodes"):
+        steps = []
+        for node in task["nodes"].values():
+            if not isinstance(node, dict):
+                continue
+            steps.extend(
+                step
+                for step in node.get("steps") or []
+                if isinstance(step, dict) and step.get("template")
+            )
+        return steps
+    return [
+        step
+        for step in task.get("steps", [])
+        if isinstance(step, dict) and step.get("template")
+    ]

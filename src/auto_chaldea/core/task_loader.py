@@ -2,6 +2,7 @@ from pathlib import Path
 
 import yaml
 
+from auto_chaldea.core.flows import expand_flow
 from auto_chaldea.utils.paths import TASK_DIR
 
 
@@ -24,7 +25,14 @@ def load_task_file(task_path):
             task = yaml.safe_load(file)
     except (OSError, yaml.YAMLError):
         return None
-    return task if isinstance(task, dict) else None
+    if not isinstance(task, dict):
+        return None
+    # flow 任务在此统一展开为图任务，UI 与执行器拿到的都是展开后的形态
+    try:
+        return expand_flow(task)
+    except ValueError as error:
+        print(f"[task] flow expansion failed: {error}")
+        return None
 
 
 def _iter_task_files(base_dir):
@@ -36,4 +44,9 @@ def _iter_task_files(base_dir):
         except (OSError, yaml.YAMLError):
             continue
         if isinstance(task, dict):
+            try:
+                task = expand_flow(task)
+            except ValueError as error:
+                print(f"[task] flow expansion failed: {error}")
+                continue
             yield yaml_path.relative_to(base_dir).with_suffix("").as_posix(), task
