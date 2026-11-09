@@ -1,7 +1,7 @@
 # 启动时的设备连接对话框：输入模拟器端口，连接成功后进入主界面
 
 from PySide6.QtCore import QSize, Qt, Signal
-from PySide6.QtGui import QIntValidator
+from PySide6.QtGui import QIntValidator, QPainter
 from PySide6.QtWidgets import (
     QApplication,
     QDialog,
@@ -15,6 +15,8 @@ from PySide6.QtWidgets import (
 
 from auto_chaldea.ui.common.icons import device_icon
 from auto_chaldea.ui.common.theme import FGO
+from auto_chaldea.ui.widgets.outlined_label import OutlinedLabel
+from auto_chaldea.ui.widgets.textured_background import paint_background
 from auto_chaldea.utils.adb_device import connect_to_device
 from auto_chaldea.utils.paths import ADB_PATH
 
@@ -26,6 +28,7 @@ class ConnectDialog(QDialog):
     def __init__(self, initial_port=None, notice=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("连接设备 - Auto-Chaldea")
+        self.setObjectName("connectDialog")
         self.setFixedWidth(380)
 
         self._port = None
@@ -44,12 +47,12 @@ class ConnectDialog(QDialog):
         )
         layout.addWidget(icon_button, alignment=Qt.AlignCenter)
 
-        title = QLabel("Auto-Chaldea", self)
+        title = OutlinedLabel("Auto-Chaldea", self)
         title.setObjectName("detailTitle")
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
-        subtitle = QLabel("输入模拟器的 ADB 端口号以连接设备", self)
+        subtitle = OutlinedLabel("输入模拟器的 ADB 端口号以连接设备", self)
         subtitle.setObjectName("detailMeta")
         subtitle.setAlignment(Qt.AlignCenter)
         layout.addWidget(subtitle)
@@ -72,20 +75,29 @@ class ConnectDialog(QDialog):
         layout.addSpacing(6)
 
         buttons = QHBoxLayout()
-        buttons.addStretch()
-
-        quit_button = QPushButton("退出", self)
-        quit_button.setCursor(Qt.PointingHandCursor)
-        quit_button.clicked.connect(self.reject)
-        buttons.addWidget(quit_button)
+        buttons.setSpacing(14)
 
         self._connect_button = QPushButton("连接", self)
-        self._connect_button.setObjectName("runButton")
+        self._connect_button.setProperty("pill", True)
         self._connect_button.setCursor(Qt.PointingHandCursor)
+        self._connect_button.setMinimumHeight(38)
         self._connect_button.setDefault(True)
         self._connect_button.clicked.connect(self._try_connect)
-        buttons.addWidget(self._connect_button)
+        buttons.addWidget(self._connect_button, 1)
+
+        quit_button = QPushButton("退出", self)
+        quit_button.setProperty("pill", True)
+        quit_button.setCursor(Qt.PointingHandCursor)
+        quit_button.setMinimumHeight(38)
+        quit_button.clicked.connect(self.reject)
+        buttons.addWidget(quit_button, 1)
         layout.addLayout(buttons)
+
+    # 自绘与主窗口一致的 FGO 质感背景
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        paint_background(self, painter)
+        painter.end()
 
     # 返回连接成功的端口号；未连接时为 None
     def port(self):

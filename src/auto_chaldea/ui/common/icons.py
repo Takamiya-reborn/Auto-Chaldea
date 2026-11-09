@@ -104,10 +104,10 @@ def _diamond_pixmap(size, lit, dpr):
         gradient.setColorAt(0.0, QColor(FGO["diamond_top"]))
         gradient.setColorAt(1.0, QColor(FGO["diamond_bottom"]))
         painter.fillPath(path, QBrush(gradient))
-        edge = QColor(FGO["gold"])
+        edge = QColor(FGO["pill_gold"])
     else:
         painter.fillPath(path, QBrush(QColor(FGO["diamond_dim"])))
-        edge = QColor("#5b7391")
+        edge = QColor("#4d5c6b")
 
     # 上半部高光，模拟 FGO 菱形的玻璃光泽
     painter.save()
@@ -126,11 +126,12 @@ def _diamond_pixmap(size, lit, dpr):
     return pm
 
 
-# 菱形底板 + 白色字形图标；lit=False 为未选中暗版
+# 菱形底板 + 字形图标；lit=False 为未选中暗版
 def diamond_icon(glyph_name, size=24, lit=True, dpr=1.0):
     plate = _diamond_pixmap(size, lit, dpr)
 
-    glyph_color = "#ffffff" if lit else "#c3d0de"
+    # 选中：白玉底板配藏青字形；未选中：灰蓝底板配深色字形
+    glyph_color = FGO["text_on_cream"] if lit else "#3d4a60"
     glyph_size = round(size * 0.52)
     glyph = qta.icon(glyph_name, color=glyph_color).pixmap(glyph_size, glyph_size)
 

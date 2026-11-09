@@ -25,6 +25,8 @@ from auto_chaldea.ui.common.icons import (
 )
 from auto_chaldea.ui.common.theme import FGO
 from auto_chaldea.ui.runtime.worker import TaskWorker
+from auto_chaldea.ui.widgets.hex_scrollbar import ScrollBox
+from auto_chaldea.ui.widgets.outlined_label import OutlinedLabel
 from auto_chaldea.ui.widgets.task_table import TaskStepTable
 from auto_chaldea.utils.adb_device import disconnect_device
 
@@ -70,12 +72,12 @@ class TaskDetailView(QWidget):
         )
         layout.addWidget(icon_button, alignment=Qt.AlignCenter)
 
-        hint = QLabel("请选择任务")
+        hint = OutlinedLabel("请选择任务")
         hint.setObjectName("emptyHint")
         hint.setAlignment(Qt.AlignCenter)
         layout.addWidget(hint)
 
-        sub_hint = QLabel("从左侧任务列表中选择一个任务查看详情")
+        sub_hint = OutlinedLabel("从左侧任务列表中选择一个任务查看详情")
         sub_hint.setObjectName("emptySubHint")
         sub_hint.setAlignment(Qt.AlignCenter)
         layout.addWidget(sub_hint)
@@ -87,21 +89,21 @@ class TaskDetailView(QWidget):
         layout.setContentsMargins(20, 16, 20, 16)
         layout.setSpacing(12)
 
-        self._title_label = QLabel(page)
+        self._title_label = OutlinedLabel(parent=page)
         self._title_label.setObjectName("detailTitle")
         layout.addWidget(self._title_label)
 
-        self._meta_label = QLabel(page)
+        self._meta_label = OutlinedLabel(parent=page)
         self._meta_label.setObjectName("detailMeta")
         layout.addWidget(self._meta_label)
 
-        self._desc_label = QLabel(page)
+        self._desc_label = OutlinedLabel(parent=page)
         self._desc_label.setObjectName("detailDesc")
         self._desc_label.setWordWrap(True)
         layout.addWidget(self._desc_label)
 
         self._table = TaskStepTable(page)
-        layout.addWidget(self._table, 1)
+        layout.addWidget(ScrollBox(self._table), 1)
 
         layout.addLayout(self._build_action_bar())
         return page
@@ -110,7 +112,7 @@ class TaskDetailView(QWidget):
         bar = QHBoxLayout()
         bar.setSpacing(10)
 
-        port_label = QLabel("设备端口")
+        port_label = OutlinedLabel("设备端口")
         port_label.setObjectName("portLabel")
         port_label.setVisible(False)
         bar.addWidget(port_label)
@@ -129,27 +131,29 @@ class TaskDetailView(QWidget):
         bar.addStretch()
 
         self._run_button = QPushButton("执行", self)
-        self._run_button.setObjectName("runButton")
+        self._run_button.setProperty("pill", True)
         self._run_button.setIcon(play_icon(FGO["text_on_cream"]))
         self._run_button.setCursor(Qt.PointingHandCursor)
         self._run_button.clicked.connect(self._start_run)
         bar.addWidget(self._run_button)
 
         self._pause_button = QPushButton("暂停", self)
+        self._pause_button.setProperty("pill", True)
         self._pause_button.setCursor(Qt.PointingHandCursor)
         self._pause_button.setIcon(pause_icon(FGO["text_on_cream"]))
         self._pause_button.clicked.connect(self._toggle_pause)
         bar.addWidget(self._pause_button)
 
         self._next_button = QPushButton("下一步", self)
+        self._next_button.setProperty("pill", True)
         self._next_button.setIcon(next_icon(FGO["text_on_cream"]))
         self._next_button.setCursor(Qt.PointingHandCursor)
         self._next_button.clicked.connect(self._skip_step)
         bar.addWidget(self._next_button)
 
         self._stop_button = QPushButton("停止", self)
-        self._stop_button.setObjectName("stopButton")
-        self._stop_button.setIcon(stop_icon("#f5e9e9"))
+        self._stop_button.setProperty("pill", True)
+        self._stop_button.setIcon(stop_icon(FGO["text_on_cream"]))
         self._stop_button.setCursor(Qt.PointingHandCursor)
         self._stop_button.clicked.connect(self._stop_run)
         bar.addWidget(self._stop_button)
@@ -272,7 +276,7 @@ class TaskDetailView(QWidget):
         self._worker.step_finished.connect(self._on_step_finished)
         self._worker.device_disconnected.connect(self._on_device_disconnected)
         self._worker.log_message.connect(
-            lambda message: self._set_status(message, FGO["muted"])
+            lambda message: self._set_status(message, FGO["gold_text"])
         )
         self._worker.finished_run.connect(self._on_finished)
         self._worker.start()

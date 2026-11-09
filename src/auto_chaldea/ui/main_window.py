@@ -16,6 +16,7 @@ from auto_chaldea.ui.views.task_detail import TaskDetailView
 from auto_chaldea.ui.views.task_panel import TaskPanel
 from auto_chaldea.ui.views.templates_panel import TemplateDetailView, TemplatesPanel
 from auto_chaldea.ui.widgets.activity_bar import ActivityBar
+from auto_chaldea.ui.widgets.textured_background import TexturedCanvas
 
 PANEL_TASKS = 0
 PANEL_TEMPLATES = 1
@@ -37,7 +38,7 @@ class MainWindow(QMainWindow):
         self._disconnecting = False
         self._device_monitor = None
 
-        central = QWidget(self)
+        central = TexturedCanvas(self)
         central.setObjectName("centralCanvas")
         self.setCentralWidget(central)
         layout = QHBoxLayout(central)

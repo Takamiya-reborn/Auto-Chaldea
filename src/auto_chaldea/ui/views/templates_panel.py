@@ -16,6 +16,8 @@ from PySide6.QtWidgets import (
 
 from auto_chaldea.ui.common.icons import dir_node_icon, refresh_icon
 from auto_chaldea.ui.common.theme import FGO
+from auto_chaldea.ui.widgets.hex_scrollbar import ScrollBox
+from auto_chaldea.ui.widgets.outlined_label import OutlinedLabel
 from auto_chaldea.ui.widgets.card_tree import (
     VIEWPORT_MARGINS,
     CardTreeWidget,
@@ -92,7 +94,7 @@ class TemplatesPanel(QWidget):
 
         header = QHBoxLayout()
         header.setContentsMargins(16, 12, 10, 12)
-        title = QLabel("模板库")
+        title = OutlinedLabel("模板库")
         title.setObjectName("panelHeader")
         header.addWidget(title)
         header.addStretch()
@@ -100,7 +102,7 @@ class TemplatesPanel(QWidget):
         refresh_button = QToolButton(self)
         refresh_button.setObjectName("panelHeaderButton")
         refresh_button.setToolTip("重新扫描模板")
-        refresh_button.setIcon(refresh_icon(FGO["muted"]))
+        refresh_button.setIcon(refresh_icon(FGO["gold_text"]))
         refresh_button.clicked.connect(self.refresh_templates)
         header.addWidget(refresh_button)
         layout.addLayout(header)
@@ -122,7 +124,7 @@ class TemplatesPanel(QWidget):
         self._tree.itemClicked.connect(self._toggle_dir_item)
         self._tree.itemExpanded.connect(self._expand_dir_item)
         self._tree.itemCollapsed.connect(lambda item: self._set_dir_icon(item, False))
-        layout.addWidget(self._tree, 1)
+        layout.addWidget(ScrollBox(self._tree), 1)
 
         self.refresh_templates()
 
@@ -201,7 +203,7 @@ class TemplatesPanel(QWidget):
     def _set_dir_icon(self, item, expanded):
         item.setIcon(
             0,
-            dir_node_icon(FGO["gold"], FGO["muted"], 90 if expanded else 0),
+            dir_node_icon(FGO["gold"], FGO["gold_text"], 90 if expanded else 0),
         )
 
     # ---- 右键菜单 ----
@@ -241,9 +243,9 @@ class TemplateDetailView(QWidget):
         layout.setSpacing(6)
 
         self._preview = _PreviewCanvas(self)
-        self._preview_name = QLabel(self)
+        self._preview_name = OutlinedLabel(parent=self)
         self._preview_name.setObjectName("previewName")
-        self._preview_info = QLabel(self)
+        self._preview_info = OutlinedLabel(parent=self)
         self._preview_info.setObjectName("previewInfo")
         layout.addStretch()
         layout.addWidget(self._preview, 1)

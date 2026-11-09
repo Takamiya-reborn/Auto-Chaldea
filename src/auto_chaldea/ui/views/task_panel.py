@@ -5,7 +5,6 @@ from pathlib import Path
 from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import (
     QHBoxLayout,
-    QLabel,
     QMenu,
     QToolButton,
     QTreeWidgetItem,
@@ -16,6 +15,8 @@ from PySide6.QtWidgets import (
 from auto_chaldea.core.task_loader import load_task_file
 from auto_chaldea.ui.common.icons import dir_node_icon, refresh_icon, task_node_icon
 from auto_chaldea.ui.common.theme import FGO
+from auto_chaldea.ui.widgets.hex_scrollbar import ScrollBox
+from auto_chaldea.ui.widgets.outlined_label import OutlinedLabel
 from auto_chaldea.ui.widgets.card_tree import (
     VIEWPORT_MARGINS as _VIEWPORT_MARGINS,
 )
@@ -49,7 +50,7 @@ class TaskPanel(QWidget):
 
         header = QHBoxLayout()
         header.setContentsMargins(16, 12, 10, 12)
-        title = QLabel("任务")
+        title = OutlinedLabel("任务")
         title.setObjectName("panelHeader")
         header.addWidget(title)
         header.addStretch()
@@ -57,7 +58,7 @@ class TaskPanel(QWidget):
         refresh_button = QToolButton(self)
         refresh_button.setObjectName("panelHeaderButton")
         refresh_button.setToolTip("重新加载任务")
-        refresh_button.setIcon(refresh_icon(FGO["muted"]))
+        refresh_button.setIcon(refresh_icon(FGO["gold_text"]))
         refresh_button.clicked.connect(self.refresh_tasks)
         header.addWidget(refresh_button)
         layout.addLayout(header)
@@ -79,7 +80,7 @@ class TaskPanel(QWidget):
         self._tree.itemClicked.connect(self._toggle_dir_item)
         self._tree.itemExpanded.connect(self._expand_dir_item)
         self._tree.itemCollapsed.connect(lambda item: self._set_dir_icon(item, False))
-        layout.addWidget(self._tree, 1)
+        layout.addWidget(ScrollBox(self._tree), 1)
 
         self.refresh_tasks()
 
@@ -126,7 +127,7 @@ class TaskPanel(QWidget):
         item = QTreeWidgetItem()
         item.setText(0, path.stem)
         item.setTextAlignment(0, Qt.AlignLeft | Qt.AlignVCenter)
-        item.setIcon(0, task_node_icon(FGO["muted"]))
+        item.setIcon(0, task_node_icon(FGO["gold_text"]))
         item.setSizeHint(0, QSize(0, 32))
         item.setToolTip(0, path.name)
         item.setFlags(Qt.ItemIsSelectable | Qt.ItemIsEnabled)
@@ -162,7 +163,7 @@ class TaskPanel(QWidget):
     def _set_dir_icon(self, item, expanded):
         item.setIcon(
             0,
-            dir_node_icon(FGO["gold"], FGO["muted"], 90 if expanded else 0),
+            dir_node_icon(FGO["gold"], FGO["gold_text"], 90 if expanded else 0),
         )
 
     # ---- 右键菜单 ----

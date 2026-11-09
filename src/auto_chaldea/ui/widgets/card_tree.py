@@ -15,6 +15,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import QProxyStyle, QStyle, QTreeWidget
 
 from auto_chaldea.ui.common.theme import FGO
+from auto_chaldea.ui.widgets.hex_scrollbar import install_hex_scrollbars
 
 # 卡片与视口边缘的留白（setContentsMargins 对滚动区视口无效）
 VIEWPORT_MARGINS = (8, 6, 8, 8)
@@ -33,6 +34,7 @@ class FastTreeStyle(QProxyStyle):
 class CardTreeWidget(QTreeWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
+        install_hex_scrollbars(self)
         self._hover_index = QPersistentModelIndex()
         # Qt 会在选中行（含缩进槽）上用调色板 Highlight 再画一层底色，
         # 盖掉卡片金边（表现为选中后边框"消失"）；置为透明后该底色不可见。
@@ -87,7 +89,7 @@ class CardTreeWidget(QTreeWidget):
         # 画在卡片之前，被卡片覆盖的部分不会显示
         if depth:
             indent = self.indentation()
-            guide = QColor(FGO["muted"])
+            guide = QColor(FGO["gold_border"])
             guide.setAlpha(60)
             painter.save()
             painter.setPen(QPen(guide, 1))

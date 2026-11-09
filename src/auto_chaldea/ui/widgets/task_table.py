@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 )
 
 from auto_chaldea.ui.common.theme import FGO
+from auto_chaldea.ui.widgets.hex_scrollbar import install_hex_scrollbars
 
 HEADERS = ("#", "模板", "匹配序号", "区域", "模式", "结果")
 
@@ -24,6 +25,7 @@ class TaskStepTable(QTableWidget):
         self.setSelectionMode(QAbstractItemView.SingleSelection)
         self.verticalHeader().setVisible(False)
         self.setAlternatingRowColors(True)
+        install_hex_scrollbars(self)
         self._running_row = None
 
     def set_steps(self, steps):
@@ -47,7 +49,7 @@ class TaskStepTable(QTableWidget):
                     Qt.AlignCenter if column != 1 else (Qt.AlignLeft | Qt.AlignVCenter)
                 )
                 if column == len(values) - 1:
-                    item.setForeground(QColor(FGO["muted"]))
+                    item.setForeground(QColor("#8a97b5"))  # 奶油底上的弱化藏青
                 self.setItem(row, column, item)
 
         header = self.horizontalHeader()
@@ -103,4 +105,4 @@ class TaskStepTable(QTableWidget):
     def clear_results(self):
         self._clear_running_row()
         for row in range(self.rowCount()):
-            self.set_result(row, "—", FGO["muted"])
+            self.set_result(row, "—", "#8a97b5")

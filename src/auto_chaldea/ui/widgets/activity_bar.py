@@ -7,7 +7,7 @@ from auto_chaldea.ui.common.icons import diamond_icon
 
 _GLYPHS = ["fa6s.list-ul", "fa6s.images", "fa6s.gear"]
 _DISCONNECT_GLYPH = "fa6s.plug-circle-xmark"
-_DIAMOND_SIZE = 34  # 菱形底板边长（按钮高 46，留少量呼吸感）
+_DIAMOND_SIZE = 48  # 菱形底板边长（按钮高 64，留足呼吸感）
 
 
 # 点击图标切换侧栏面板，再次点击收起侧栏
@@ -19,13 +19,13 @@ class ActivityBar(QWidget):
         super().__init__(parent)
         self.setObjectName("activityBar")
         self.setAttribute(Qt.WA_StyledBackground, True)
-        self.setFixedWidth(52)
+        self.setFixedWidth(74)
 
         self._buttons = []
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 12, 0, 12)
-        layout.setSpacing(6)
+        layout.setContentsMargins(0, 14, 0, 14)
+        layout.setSpacing(8)
 
         tooltips = ["任务", "模板库"]
         for index, tooltip in enumerate(tooltips):
@@ -52,12 +52,14 @@ class ActivityBar(QWidget):
         button = QToolButton(self)
         button.setObjectName("activityButton")
         button.setToolTip(tooltip)
+        button.setText(tooltip)  # 菱形下方的文字标签，仿 FGO 终端 / 编队页签
+        button.setToolButtonStyle(Qt.ToolButtonTextUnderIcon)
         self._apply_icon(button, _GLYPHS[index], lit=False)
         button.setIconSize(QSize(_DIAMOND_SIZE, _DIAMOND_SIZE))
         button.setCheckable(True)
         button.setAutoExclusive(True)
         button.setCursor(Qt.PointingHandCursor)
-        button.setFixedHeight(46)
+        button.setFixedHeight(76)
         button.clicked.connect(
             lambda _checked=False, idx=index: self.panel_requested.emit(idx)
         )
@@ -70,7 +72,7 @@ class ActivityBar(QWidget):
         self._apply_icon(button, _DISCONNECT_GLYPH, lit=False)
         button.setIconSize(QSize(_DIAMOND_SIZE, _DIAMOND_SIZE))
         button.setCursor(Qt.PointingHandCursor)
-        button.setFixedHeight(46)
+        button.setFixedHeight(64)
         button.clicked.connect(lambda: self.disconnect_requested.emit())
         return button
 
