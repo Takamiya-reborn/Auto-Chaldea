@@ -1,4 +1,4 @@
-# 屏幕帧来源：统一截屏 + 最近一帧缓存（原始格式优先、点击后失效、ROI 缓存）。
+# 屏幕帧来源：统一截屏 + 最近一帧缓存（原始格式优先、点击后失效）。
 # 缓存语义见 README「屏幕帧复用」一节
 
 import struct
@@ -30,8 +30,6 @@ class ScreenSource:
         self._lock = threading.Lock()
         self._frame = None
         self._raw_disabled = False
-        # 模板标识 → 最近命中矩形 (x1, y1, x2, y2)，全屏坐标系
-        self._roi_cache = {}
 
     # ---- 帧缓存 ----
 
@@ -54,18 +52,6 @@ class ScreenSource:
             return frame, 0, 0
         x1, y1, x2, y2 = region
         return frame[y1:y2, x1:x2], x1, y1
-
-    # ---- ROI 缓存 ----
-
-    def get_cached_roi(self, template_key):
-        return self._roi_cache.get(str(template_key))
-
-    # 记录模板最近命中位置（含余量），下次小范围搜索
-    def set_cached_roi(self, template_key, rect):
-        self._roi_cache[str(template_key)] = tuple(int(value) for value in rect)
-
-    def clear_cached_roi(self, template_key):
-        self._roi_cache.pop(str(template_key), None)
 
     # ---- 截屏实现 ----
 

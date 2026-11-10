@@ -1,5 +1,8 @@
 # 节点图运行器：节点 = 一个画面（识别 + 动作），next = 有序候选列表。
-# 节点字段与路由规则见 docs/task-yaml.md「节点图任务」一节
+# 节点字段与路由规则见 docs/task-yaml.md「节点图任务」一节。
+# store：可选的共享状态仓（鸭子类型，只需 get(key, default) 与
+# decrement(key, by) 两个方法），供 store_gate / store_end 节点字段读写
+# 运行期变量（如剩余周回次数）
 
 import time
 
@@ -20,6 +23,10 @@ from auto_chaldea.utils.screen import get_screen
 VISIT_RETRY_INTERVAL = 0.2
 VISIT_MAX_RETRY_INTERVAL = 3.0
 VISIT_BACKOFF_FACTOR = 2.0
+
+# store_end 宽限期：等待无命中持续超过该秒数才视为"结算画面已点完、
+# 画面回到了无候选的界面"，避免结算画面切换的瞬间误判收尾
+STORE_END_GRACE = 2.0
 
 
 # 任务图结构错误：加载时立即报错，不让坏图运行到一半才失败
@@ -89,6 +96,7 @@ def execute_graph(
     should_skip=None,
     screen=None,
     click_fn=None,
+    store=None,
     progress=None,
 ):
     # 沿任务图行走：每轮访问取一帧截图，按序尝试候选节点，命中即执行其动作
@@ -132,6 +140,9 @@ def execute_graph(
         return result
 
     exec_times = {}
+    # 收尾阶段标志（单元素列表以便 _visit 原位更新）：命中声明 store_end
+    # 的结算链节点后置 True，命中任何其他节点即复位 False
+    settled = [False]
     pending = entry
     while pending:
         if should_stop is not None and should_stop():
@@ -150,6 +161,8 @@ def execute_graph(
             clicker=clicker,
             fixed_clicks=fixed_clicks,
             resolved_steps=resolved_steps,
+            store=store,
+            settled=settled,
             progress=progress,
         )
         if outcome is None:
@@ -176,6 +189,8 @@ def _visit(
     clicker,
     fixed_clicks,
     resolved_steps,
+    store=None,
+    settled=None,
     progress=None,
 ):
     # 候选中声明了 timeout 的节点构成可选等待期限：超时视为已处理，
@@ -189,13 +204,21 @@ def _visit(
 
     interval = VISIT_RETRY_INTERVAL
     attempts = 0
+    wait_started = time.monotonic()
     while True:
         attempts += 1
         # 每轮扫描用新帧：等待期间画面可能因动画/转场变化
         if screen is not None:
             screen.invalidate()
         hit = _scan_candidates(
-            pending, nodes, exec_times, adb_path, template_dir, device, screen
+            pending,
+            nodes,
+            exec_times,
+            adb_path,
+            template_dir,
+            device,
+            screen,
+            store=store,
         )
         if hit is not None:
             break
@@ -217,6 +240,19 @@ def _visit(
             return None
         if deadline is not None and time.monotonic() >= deadline:
             return _route_on_timeout(pending, nodes)
+        # 状态仓收尾：仅在收尾阶段（收尾标志由 _visit 在命中节点时维护）
+        # 等待无命中持续超过宽限期，视为"结算画面已点完"——本次图执行正
+        # 常结束（次数是否耗尽由 worker 侧 while remaining > 0 决定是否继
+        # 续）。回合操作与轮次衔接期间标志为 False，静默只是动画间隙，
+        # 完全不做收尾判断
+        if (
+            settled is not None
+            and settled[0]
+            and store is not None
+            and time.monotonic() - wait_started >= STORE_END_GRACE
+        ):
+            print("[graph] settlement store_end reached, graph pass complete")
+            return []
         sleep_fn(interval)
         interval = min(interval * VISIT_BACKOFF_FACTOR, VISIT_MAX_RETRY_INTERVAL)
 
@@ -224,6 +260,17 @@ def _visit(
     node = nodes[name]
     if not exceeded:
         exec_times[name] = exec_times.get(name, 0) + 1
+        # store_gate 命中即消耗一次状态仓键值（如连续出击命中 = 开启
+        # 下一轮周回），与 exec_times 递增同点执行
+        gate = node.get("store_gate")
+        if gate is not None and store is not None:
+            left = store.decrement(gate, 1)
+            print(f"[graph] node {name!r} consumed store {gate!r}, remaining={left}")
+    # 收尾阶段标志：命中结算链节点（声明 store_end）进入收尾，此后等待
+    # 静默才计时判结束；命中任何其他节点（选助战、战斗、连续出击等）
+    # 都离开收尾——阶段由图的走向显式声明，等待循环不做任何推断
+    if settled is not None:
+        settled[0] = node.get("store_end") is not None
     print(
         f"[graph] node {name!r} hit (times={exec_times.get(name, 0)}), "
         f"candidates were {pending}"
@@ -250,7 +297,7 @@ def _visit(
 # 按序扫描候选：返回 (节点名, 匹配列表, 是否已达 max_times)，无命中返回 None。
 # 共用同一帧截图——这就是图模型"一个节点试多个候选只截一次屏"的收益点
 def _scan_candidates(
-    pending, nodes, exec_times, adb_path, template_dir, device, screen
+    pending, nodes, exec_times, adb_path, template_dir, device, screen, store=None
 ):
     for name in pending:
         node = nodes[name]
@@ -282,8 +329,22 @@ def _scan_candidates(
                 )
                 return name, matches, True
             continue
+
+        # store_gate：状态仓键值 < 1（次数耗尽）或无状态仓时视为不存在，
+        # 同帧继续扫描后续候选，路由不受阻
+        gate = node.get("store_gate")
+        if gate is not None and (store is None or _store_value(store, gate) < 1):
+            continue
         return name, matches, False
     return None
+
+
+# store 键值 → int：容忍非数值与缺键，缺省视为耗尽（0）
+def _store_value(store, key):
+    try:
+        return int(store.get(key, 0) or 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 # 超时/跳过时的路由：优先"可选节点超时视为已处理"——取第一个声明了
@@ -341,6 +402,12 @@ def _run_node(
     if exceeded:
         return list(node.get("exceeded_next") or [])
 
+    steps = resolved_steps.get(name) or []
+    # 无子步骤的节点（周回外壳：选助战、开始任务、结算等）也回报进度，
+    # 供界面在「准备」/「收尾」锚点行上高亮
+    if not steps and progress is not None:
+        progress(name, 0, "running")
+
     pre_delay = _node_float(node, "pre_delay")
     if pre_delay:
         sleep_fn(pre_delay)
@@ -365,7 +432,6 @@ def _run_node(
             )
             clicker(int(target["x"]), int(target["y"]))
 
-    steps = resolved_steps.get(name) or []
     for position, step in enumerate(steps):
         if should_stop is not None and should_stop():
             return None
@@ -405,6 +471,9 @@ def _run_node(
     post_delay = _node_float(node, "post_delay")
     if post_delay:
         sleep_fn(post_delay)
+
+    if not steps and progress is not None:
+        progress(name, 0, "executed")
 
     if failed:
         on_error = node.get("on_error_next")

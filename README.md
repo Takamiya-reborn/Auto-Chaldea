@@ -40,7 +40,7 @@ Auto-Chaldea 是一个基于 ADB、OpenCV 和 PySide6 的 FGO 自动化辅助工
 - 支持 `single` / `multi` / `none` 三种识别模式
 - 允许通过 `Center` 直接点击屏幕中心，跳过模板识别；也支持 `Enemy1` / `Enemy2` / `Enemy3` 等内置坐标点
 - 任务执行器会按顺序执行，直到目标出现、点击成功或任务失败
-- 推荐用内置标准周回 `flow` 编写任务；手写 `nodes` 节点图客制化程度高但编写难度大，用于特殊流程，编写规则见 [docs/task-yaml.md](docs/task-yaml.md)
+- 推荐用内置标准周回（`type: flow`）编写任务；手写 `nodes` 节点图（`type: nodes`）客制化程度高但编写难度大，用于特殊流程，编写规则见 [docs/task-yaml.md](docs/task-yaml.md)
 
 ### 4. 桌面化执行界面
 
@@ -87,7 +87,7 @@ Auto-Chaldea 是一个基于 ADB、OpenCV 和 PySide6 的 FGO 自动化辅助工
 │           ├── adb_device.py
 │           ├── paths.py
 │           ├── recognizer.py
-│           └── screen.py            # 帧来源：截屏 + 帧缓存 + ROI 缓存
+│           └── screen.py            # 帧来源：截屏 + 帧缓存
 ├── assets/
 │   ├── platform-tools/
 │   ├── qss/
@@ -157,8 +157,8 @@ uv run scripts/check.py "Path to template image" --device SERIAL
 
 ## 任务 YAML
 
-任务配置位于 `assets/task/`，推荐用内置标准周回 `flow` 编写（连刷次数由 UI 的
-「执行次数」输入驱动）；特殊流程可手写 `nodes` 节点图，客制化程度高但编写难度大。
+任务配置位于 `assets/task/`，推荐用内置标准周回编写（`type: flow`，连刷次数由 UI 的
+「执行次数」输入驱动）；特殊流程可手写 `nodes` 节点图（`type: nodes`），客制化程度高但编写难度大。
 完整编写规则、字段说明与示例见 [docs/task-yaml.md](docs/task-yaml.md)。
 
 ## 屏幕帧复用
@@ -167,7 +167,6 @@ uv run scripts/check.py "Path to template image" --device SERIAL
 
 - **原始格式截屏**：`screencap` 不带 `-p`，跳过设备端 PNG 编码与主机端解码；解析失败时自动回退 PNG 并记住，后续不再尝试原始格式
 - **帧缓存**：识别只读缓存帧；点击成功后由执行器立即失效，重试循环每轮也强制刷新，语义与旧版"每次识别都截屏"一致
-- **ROI 缓存**：single 模式且 `index: 0` 时启用——模板命中后记住位置（向外扩一圈模板尺寸作余量），下次只在附近小区域搜索；未命中自动退回全区域搜索
 - **图模式额外收益**：一轮访问按序尝试全部候选时共用同一帧截图
 
 ## 开发上手建议

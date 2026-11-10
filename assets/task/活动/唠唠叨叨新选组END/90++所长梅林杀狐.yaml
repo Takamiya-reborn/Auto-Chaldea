@@ -1,6 +1,6 @@
 task_name: 90++
 prerequisite: 所长1号位，杀狐、梅林2、3号位，穿CD服，注意所长带活动倍卡，或者芙尔摩斯等高攻击礼装
-flow: 标准周回
+type: flow
 turns:
   1:
     skills:

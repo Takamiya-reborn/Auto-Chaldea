@@ -13,8 +13,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from auto_chaldea.core.task_executor import expand_named_steps
-from auto_chaldea.core.task_schema import node_step_rows, valid_steps
+from auto_chaldea.core.task_schema import task_step_view
 from auto_chaldea.ui.common.icons import (
     next_icon,
     pause_icon,
@@ -23,6 +22,7 @@ from auto_chaldea.ui.common.icons import (
     tasks_icon,
 )
 from auto_chaldea.ui.common.theme import FGO
+from auto_chaldea.ui.runtime.state import RunStateStore
 from auto_chaldea.ui.runtime.worker import TaskWorker
 from auto_chaldea.ui.views.run_count_dialog import ExecutionCountDialog
 from auto_chaldea.ui.widgets.hex_scrollbar import ScrollBox
@@ -42,8 +42,13 @@ class TaskDetailView(QWidget):
         self._task = None
         self._filename = ""
         self._worker = None
-        self._execution_total = 0
-        self._execution_current = 0
+        # 周回轮数状态仓：界面与执行引擎共用，run_started / changed 信号
+        # 驱动「第 X/Y 轮」状态刷新（引擎在工作线程写入，信号排队投递）
+        self._store = RunStateStore(self)
+        self._store.run_started.connect(self._on_run_started)
+        self._store.changed.connect(self._on_store_changed)
+        self._status_text = "就绪"
+        self._status_color = None
         # 节点子步骤 → 表格行号映射，执行进度高亮用
         self._step_rows = {}
 
@@ -172,8 +177,7 @@ class TaskDetailView(QWidget):
         self._cancel_running_worker()
         self._task = task
         self._filename = filename
-        self._execution_total = 0
-        self._execution_current = 0
+        self._store.clear_session()
 
         if task is None:
             self._step_rows = {}
@@ -181,17 +185,18 @@ class TaskDetailView(QWidget):
             return
 
         name = task.get("task_name") or task.get("name") or "未命名任务"
-        # 展开命名坐标点拆分出的步骤，保证表格行数与运行时步骤一一对应
-        steps = expand_named_steps(valid_steps(task))
+        # 表格行与运行时步骤一一对应（命名坐标点展开后），首尾加「准备」
+        # 「收尾」锚点行对应周回外壳节点
+        rows, node_rows = task_step_view(task)
         self._title_label.setText(name)
-        self._meta_label.setText(f"来源 {filename}.yaml · 共 {len(steps)} 个步骤")
+        self._meta_label.setText(f"来源 {filename}.yaml · 共 {len(rows)} 个步骤")
 
         prerequisite = task.get("prerequisite") or task.get("description")
         self._desc_label.setText(f"执行要求：{prerequisite}" if prerequisite else "")
         self._desc_label.setVisible(bool(prerequisite))
 
-        self._table.set_steps(steps)
-        self._step_rows = node_step_rows(task)
+        self._table.set_steps(rows)
+        self._step_rows = node_rows
         self._stack.setCurrentIndex(1)
 
     # 窗口关闭前停止后台任务并断开 ADB 连接
@@ -222,7 +227,6 @@ class TaskDetailView(QWidget):
         if worker is None:
             return
         for signal in (
-            worker.execution_started,
             worker.node_step,
             worker.skip_consumed,
             worker.device_disconnected,
@@ -241,12 +245,15 @@ class TaskDetailView(QWidget):
         if self._worker is not None or self._task is None:
             return
 
-        steps = expand_named_steps(valid_steps(self._task))
-        if not steps:
+        rows, _ = task_step_view(self._task)
+        if len(rows) <= 2:
+            # 只剩「准备」「收尾」锚点行：没有可执行的战斗子步骤
             self._set_status("任务没有可执行的步骤", FGO["attention"])
             return
 
-        dialog = ExecutionCountDialog(parent=self)
+        dialog = ExecutionCountDialog(
+            initial=self._store.get("last_total") or 1, parent=self
+        )
         if dialog.exec() != ExecutionCountDialog.Accepted:
             return
         execution_total = dialog.value()
@@ -265,10 +272,8 @@ class TaskDetailView(QWidget):
                 return
 
         self._table.clear_results()
-        self._execution_total = execution_total
-        self._execution_current = 1
-        self._worker = TaskWorker(self._task, port or None, execution_total)
-        self._worker.execution_started.connect(self._on_execution_started)
+        self._store.begin_session(execution_total)
+        self._worker = TaskWorker(self._task, port or None, store=self._store)
         self._worker.node_step.connect(self._on_node_step)
         self._worker.skip_consumed.connect(self._on_skip_consumed)
         self._worker.device_disconnected.connect(self._on_device_disconnected)
@@ -279,7 +284,7 @@ class TaskDetailView(QWidget):
         self._worker.start()
 
         self._set_running_state(running=True)
-        self._set_status(f"运行中 · 共 {len(steps)} 个步骤", FGO["accent"])
+        self._set_status(f"运行中 · 共 {len(rows)} 个步骤", FGO["accent"])
 
     def _toggle_pause(self):
         worker = self._worker
@@ -313,11 +318,15 @@ class TaskDetailView(QWidget):
     def _on_skip_consumed(self):
         self._set_status("运行中", FGO["accent"])
 
-    def _on_execution_started(self, execution):
-        # 每一轮开始前清空上一轮的结果，避免多次执行时旧状态覆盖堆积
-        self._execution_current = execution
+    # store 信号：新一轮周回开始（首轮进入图前，或结算命中连续出击开启
+    # 后续轮）——清空上一轮结果，避免旧状态覆盖堆积
+    def _on_run_started(self, _run):
         self._table.clear_results()
         self._set_status("运行中", FGO["accent"])
+
+    # store 信号：任意键变更——仅刷新「第 X/Y 轮」前缀
+    def _on_store_changed(self, _key, _value):
+        self._render_status()
 
     # 图执行进度 → 表格行：节点子步骤按映射找到行，高亮运行中的行并
     # 写入结果列；无子步骤的节点（选助战、结算等）不产生行事件
@@ -370,8 +379,17 @@ class TaskDetailView(QWidget):
         self._port_edit.setEnabled(not running)
 
     def _set_status(self, text, color=None):
-        if self._execution_total:
-            text = f"第 {self._execution_current}/{self._execution_total} 轮 · {text}"
+        self._status_text = text
+        self._status_color = color
+        self._render_status()
+
+    # 渲染状态栏文本；会话进行中时附加「第 X/Y 轮」前缀（当前轮号由
+    # 状态仓实时计算，连续出击开启的轮次也会即时反映）
+    def _render_status(self):
+        text = self._status_text
+        if self._store.total:
+            text = f"第 {self._store.current_run}/{self._store.total} 轮 · {text}"
+        color = self._status_color
         if color:
             self._status_label.setText(f'<span style="color:{color};">●</span> {text}')
         else:

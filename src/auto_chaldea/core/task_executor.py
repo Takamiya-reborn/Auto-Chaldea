@@ -16,7 +16,8 @@ DEFAULT_MAX_RETRY_INTERVAL = 3.0
 RETRY_BACKOFF_FACTOR = 2.0
 # 点击成功后、推进到下一步前的默认等待间隔（秒）
 DEFAULT_STEP_INTERVAL = 1.0
-# double: true 时两次点击的间隔（秒）：第一击触发，第二击加速动画播放
+# double: true 时两次点击的间隔（秒）：第一击触发，第二击加速动画播放。
+# double 也可填数字，表示延后双击——第一击后延迟该秒数再补第二击
 DOUBLE_CLICK_INTERVAL = 0.1
 # 超时视为已处理，继续下一步。
 TIMEOUT_RESULT = "timeout"
@@ -25,7 +26,7 @@ SKIP_RESULT = "skip"
 
 # 命名坐标点：template 字段可直接使用这些名称，无需模板识别，直接点击对应位置。
 # 坐标以 NAMED_POINT_BASE_SIZE 为基准填写（像素），执行时按实际屏幕尺寸等比缩放；
-# Center 特殊处理为屏幕中心，不在此表中。
+# Center 特殊处理为屏幕中心，不在此表中——Center 为内部保留常量，yaml 不允许编写。
 # 坐标为 (x, y) 元组，单个轴可以是 None 表示尚未测量，使用时会报错并指出缺哪个轴。
 NAMED_POINT_BASE_SIZE = (1280, 720)
 NAMED_POINTS = {
@@ -128,11 +129,15 @@ def _step_float(step, key, default):
     return default if value in (None, "") else float(value)
 
 
-# 单击 + 可选双击（double: true）：第二击落在动画播放中，用于加速动画播放
+# 单击 + 可选双击：第二击落在动画播放中，用于加速动画播放。
+# double: true → 双击（间隔 DOUBLE_CLICK_INTERVAL）；double: 数字 →
+# 延后双击，第一击后延迟该秒数再补第二击（如选完技能目标、动画开始后）
 def _click_maybe_double(clicker, x, y, step, sleep_fn):
     result = clicker(int(x), int(y))
-    if result and step.get("double"):
-        sleep_fn(DOUBLE_CLICK_INTERVAL)
+    double = step.get("double")
+    if result and double:
+        interval = DOUBLE_CLICK_INTERVAL if double is True else float(double)
+        sleep_fn(interval)
         result = clicker(int(x), int(y)) or result
     return result
 
@@ -213,7 +218,7 @@ def execute_step(
     index = int(step.get("index") or 0)
 
     recognizer = recognizer_fn or _build_recognizer(
-        adb_path, template_dir, device, screen, use_roi_cache=index == 0
+        adb_path, template_dir, device, screen
     )
     multi_recognizer = multi_recognizer_fn or _build_multi_recognizer(
         adb_path, template_dir, device, screen
@@ -334,7 +339,8 @@ def execute_step(
             return TIMEOUT_RESULT
         result = False
         for target in matches:
-            if clicker(target["x"], target["y"]):
+            # multi 步骤同样支持 double / 延后双击（逐个点击目标时生效）
+            if _click_maybe_double(clicker, target["x"], target["y"], step, sleep_fn):
                 result = True
         if result and step_interval:
             sleep_fn(step_interval)
@@ -380,9 +386,7 @@ def execute_step(
     return result
 
 
-def _build_recognizer(
-    adb_path, template_dir, device=None, screen=None, use_roi_cache=False
-):
+def _build_recognizer(adb_path, template_dir, device=None, screen=None):
     return lambda template_path, region: find_all_matches(
         template_path,
         adb_path=adb_path,
@@ -390,7 +394,6 @@ def _build_recognizer(
         region=region,
         device=device,
         screen=screen,
-        use_roi_cache=use_roi_cache,
     )
 
 

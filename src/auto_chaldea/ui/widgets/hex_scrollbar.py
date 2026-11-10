@@ -18,6 +18,10 @@ _TIP = 9  # 六边形尖端长度
 _MARGIN = 1  # 手柄留白
 _PROTRUDE = 3  # 手柄单侧超出轨道的量，制造层次感
 _TRACK_ALPHA = 128  # 轨道不透明度（50%）
+# 手柄正投影：与按钮同色的暗影。QPainter 没有高斯模糊，
+# 用由内到外逐层变淡的同形描边模拟四周均匀扩散的软阴影
+_SHADOW_COLOR = (18, 34, 54)  # 与 theme.py 按钮投影同色
+_SHADOW_LAYERS = ((2, 100), (4, 70), (6, 40))  # (描边宽度, 不透明度)
 
 
 class HexScrollBar(QScrollBar):
@@ -98,11 +102,22 @@ class HexScrollBar(QScrollBar):
         path.addPolygon(QPolygonF(points))
         path.closeSubpath()
 
+        if self.isEnabled():
+            self._draw_shadow(painter, path)
         painter.setPen(QPen(QColor(_GOLD), 2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
         painter.setBrush(gradient)
         if not self.isEnabled():
             painter.setOpacity(0.4)
         painter.drawPath(path)
+
+    # 手柄四周的正投影：逐层加宽描边、逐层变淡，外层被手柄填充盖住，
+    # 只露出均匀的暗影边缘
+    def _draw_shadow(self, painter, path):
+        painter.setBrush(Qt.NoBrush)
+        for width, alpha in _SHADOW_LAYERS:
+            color = QColor(*_SHADOW_COLOR, alpha)
+            painter.setPen(QPen(color, width, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
+            painter.drawPath(path)
 
 
 # 把六边形滚动条装到滚动区域（同时替换横竖两条）

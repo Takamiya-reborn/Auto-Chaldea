@@ -3,6 +3,7 @@ from pathlib import Path
 import yaml
 
 from auto_chaldea.core.flows import expand_flow
+from auto_chaldea.core.task_schema import reject_center
 from auto_chaldea.utils.paths import TASK_DIR
 
 
@@ -28,11 +29,13 @@ def load_task_file(task_path):
         return None
     if not isinstance(task, dict):
         return None
-    # flow 任务在此统一展开为图任务，UI 与执行器拿到的都是展开后的形态
+    # flow 任务在此统一展开为图任务，UI 与执行器拿到的都是展开后的形态；
+    # 展开后校验 Center 禁写（内部保留常量，yaml 不允许出现）
     try:
         task = expand_flow(task)
+        reject_center(task)
     except ValueError as error:
-        print(f"[task] flow expansion failed: {error}")
+        print(f"[task] {Path(task_path).name}: {error}")
         return None
     if not task.get("nodes"):
         print(

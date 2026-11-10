@@ -11,20 +11,21 @@ from auto_chaldea.utils.paths import ADB_PATH, TEMPLATE_DIR
 
 
 # 在独立线程中顺序执行任务步骤，通过 pause / resume / stop 从主线程
-# 控制；所有信号排队投递到主线程，可安全更新界面
+# 控制；所有信号排队投递到主线程，可安全更新界面。
+# 周回轮数由注入的 store（RunStateStore）驱动：进入图前消耗一次开启
+# 第 1 轮，图内连续出击命中继续消耗并开启后续轮；store 剩余为 0 时停
 class TaskWorker(QThread):
-    execution_started = Signal(int)  # 参数：执行次数（从 1 开始）
     node_step = Signal(str, int, str)  # 参数：节点名、子步骤序号、状态
     skip_consumed = Signal()  # 一次"下一步"请求已被执行端消费（跳过生效）
     log_message = Signal(str)
     device_disconnected = Signal()
     finished_run = Signal(bool)  # 参数：任务是否完整跑完（未被停止）
 
-    def __init__(self, task, port=None, execution_total=1, parent=None):
+    def __init__(self, task, port=None, store=None, parent=None):
         super().__init__(parent)
         self._task = task
         self._port = port
-        self._execution_total = execution_total
+        self._store = store
         self._resume_event = threading.Event()
         self._resume_event.set()
         self._stop_requested = threading.Event()
@@ -88,14 +89,15 @@ class TaskWorker(QThread):
 
     # ---- 线程主体 ----
 
-    # 节点图任务执行：每次执行跑一遍图，节点进度通过日志投递到界面
+    # 节点图任务执行：while remaining > 0 驱动——每次进入图前消耗一次
+    # 开启新一轮，图内连续出击命中可在同一轮图执行里继续开启后续轮；
+    # 节点进度通过信号投递到界面
     def _run_graph(self, device):
         completed = True
         try:
-            for execution in range(1, self._execution_total + 1):
-                if self._stop_requested.is_set():
-                    break
-                self.execution_started.emit(execution)
+            while not self._stop_requested.is_set() and self._store.remaining > 0:
+                # 本轮开始：消耗一次剩余次数，run_started 随之发出
+                self._store.decrement("remaining")
                 self._skip_requested.clear()
                 self._wait_while_paused()
                 if self._stop_requested.is_set():
@@ -113,11 +115,13 @@ class TaskWorker(QThread):
                     sleep_fn=self._interruptible_sleep,
                     should_stop=self._stop_requested.is_set,
                     should_skip=self._consume_skip,
+                    store=self._store,
                     progress=progress,
                 )
                 if result is False:
                     self.log_message.emit(
-                        f"第 {execution} 次执行未走完任务图（等待超时或步骤失败），任务终止。"
+                        f"第 {self._store.current_run} 轮执行未走完任务图"
+                        f"（等待超时或步骤失败），任务终止。"
                     )
                     completed = False
                     break

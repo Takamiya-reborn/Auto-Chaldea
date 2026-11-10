@@ -1,6 +1,6 @@
 task_name: 90+
 prerequisite: 1号位所长，2号位仇龙娘，御主穿CD服
-flow: 标准周回
+type: flow
 turns:
   1:
     skills:

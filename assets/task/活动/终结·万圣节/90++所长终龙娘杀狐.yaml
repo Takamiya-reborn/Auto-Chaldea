@@ -1,11 +1,12 @@
 task_name: 90++
 prerequisite: 1号位所长，2号位仇龙娘，3号位杀狐，御主穿CD服
-flow: 标准周回
+type: flow
 turns:
   1:
     skills:
       - pool: 2
       - pool: 2
+        index: 0
       - pool: 5
       - pool: 3
         index: 1

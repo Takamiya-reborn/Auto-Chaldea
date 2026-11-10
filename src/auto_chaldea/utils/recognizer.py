@@ -72,18 +72,6 @@ def _extract_matches(
     return matches
 
 
-# 命中矩形向外扩一圈模板尺寸作为 ROI 余量，容忍下次出现位置小幅移动
-def _roi_with_margin(match, frame_width, frame_height):
-    margin_x = match["width"]
-    margin_y = match["height"]
-    return (
-        max(0, match["left"] - margin_x),
-        max(0, match["top"] - margin_y),
-        min(frame_width, match["left"] + match["width"] + margin_x),
-        min(frame_height, match["top"] + match["height"] + margin_y),
-    )
-
-
 # 只保留调用方需要的字段并按屏幕位置排序
 def _compact_matches(matches):
     matches = [
@@ -122,11 +110,10 @@ def find_all_matches(
     threshold=0.7,
     device=None,
     screen=None,
-    use_roi_cache=False,
 ):
     # 查找模板的全部匹配，并按屏幕位置排序。
-    # use_roi_cache 时先在上次命中位置附近小范围搜索（MAA 式 cache），
-    # 未命中再退回全区域搜索；同一帧内两段搜索共用一次截屏
+    # 每次都在声明区域内全量搜索：同一模板在屏上可能有多个实例，
+    # 且目标实例会随回合变化，缓存上次命中位置会锁死搜索范围
     if screen is None:
         screen = get_screen(adb_path=adb_path, device=device)
 
@@ -139,28 +126,7 @@ def find_all_matches(
     if region is None:
         region = (0, 0, frame_width, frame_height)
 
-    if use_roi_cache:
-        cached_rect = screen.get_cached_roi(template_path)
-        if cached_rect is not None:
-            x1 = max(cached_rect[0], region[0])
-            y1 = max(cached_rect[1], region[1])
-            x2 = min(cached_rect[2], region[2])
-            y2 = min(cached_rect[3], region[3])
-            if x1 < x2 and y1 < y2:
-                matches = _match_in_region(
-                    template, frame, (x1, y1, x2, y2), threshold
-                )
-                if matches:
-                    screen.set_cached_roi(
-                        template_path, _roi_with_margin(matches[0], frame_width, frame_height)
-                    )
-                    return _compact_matches(matches)
-
     matches = _match_in_region(template, frame, region, threshold)
-    if use_roi_cache and matches:
-        screen.set_cached_roi(
-            template_path, _roi_with_margin(matches[0], frame_width, frame_height)
-        )
     return _compact_matches(matches)
 
 

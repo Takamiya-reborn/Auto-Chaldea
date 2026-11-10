@@ -8,30 +8,37 @@ _T_TOUCH = "基本/请点击游戏界面"
 _T_NEXT = "基本/下一步"
 _T_ATTACK = "基本/attack"
 _T_MASTER = "基本/御主技能"
+_T_CONTINUOUS = "基本/连续出击"
+# 选卡槽位间的点击间隔（秒）：选中动画较短，压到 0.5 加快选卡节奏
+_CARD_STEP_INTERVAL = 0.5
+
+# 选目标条目补第二击加速动画的延迟（秒）：第一击选中目标、动画开始后，
+# 第二击落在动画播放中加速播放（内部延后双击，无需手写 Center 点击）
+TARGET_DOUBLE_DELAY = 0.5
 
 
-# flow 名 → 构建函数；返回 {"entry": [...], "nodes": {...}}
+# 内置 flow → 构建函数；type: flow 时取用，返回 {"entry": [...], "nodes": {...}}
 _FLOWS = {}
 
 
-# 展开 flow 任务为图任务：无 flow 字段时原样返回（手写 nodes 的逃生门）。
-# 展开结果去掉 flow 键保证幂等：任务在 loader 处展开一次，下游（UI、
+# 展开 flow 任务为图任务：type 为 'flow' 时用内置图模板构建节点图；
+# type 为 'nodes' 或缺省时原样返回（手写 nodes 的逃生门）。
+# 展开结果去掉 type 键保证幂等：任务在 loader 处展开一次，下游（UI、
 # execute_graph）重复进入展开只是无害的空操作
 def expand_flow(task):
-    if not isinstance(task, dict) or not task.get("flow"):
+    if not isinstance(task, dict) or not task.get("type"):
         return task
+    kind = str(task["type"]).strip()
+    if kind == "nodes":
+        return task
+    if kind != "flow":
+        raise ValueError(f"Unknown type: {kind!r}, expected 'flow' or 'nodes'")
     if task.get("nodes"):
         # 手写节点优先：两者同时存在时以 nodes 为准
-        print(f"[flow] task defines both 'flow' and 'nodes'; using 'nodes'")
+        print("[flow] task defines both 'type: flow' and 'nodes'; using 'nodes'")
         return task
-    name = str(task["flow"]).strip()
-    builder = _FLOWS.get(name)
-    if builder is None:
-        raise ValueError(
-            f"Unknown flow: {name!r}, available flows: {sorted(_FLOWS)}"
-        )
-    built = builder(task)
-    expanded = {key: value for key, value in task.items() if key != "flow"}
+    built = _FLOWS[FLOW_STANDARD_FARM](task)
+    expanded = {key: value for key, value in task.items() if key != "type"}
     expanded.update({"entry": built["entry"], "nodes": built["nodes"]})
     return expanded
 
@@ -51,21 +58,25 @@ def _build_standard_farm(task):
             f"'turns' keys must be consecutive turns starting at 1: {turns}"
         )
 
-    # 连刷次数由 UI 的执行次数输入驱动：一次图执行 = 一轮完整周回。
-    # 选助战 max_times=1：结算回到选关界面后命中即超限，本轮结束
+    # 连刷次数由 UI 的执行次数输入驱动，存于共享状态仓（remaining = 尚未
+    # 开始的轮数）。一次循环的边界：起始 = 选助战命中；结束 = 命中连续出击
+    # （store_gate 消耗一次并回到选助战开启下一轮）或结算画面点完后经
+    # store_end 结束本次图执行。worker 侧 while remaining > 0 决定是否
+    # 继续下一轮，因此一轮图执行可覆盖多轮周回
     nodes = {
         "选助战": {
             "template": "助战池/选助战",
             "region": "右",
-            "max_times": 1,
-            "exceeded_next": [],
             "next": ["开始任务"],
+            # 周回外壳节点标记：无子步骤，执行进度落在「准备」锚点行
+            "_phase": "准备",
         },
         "开始任务": {
             "template": "基本/开始任务",
             "region": "右下",
             "timeout": 3,
             "next": [_battle_node(1)],
+            "_phase": "准备",
         },
     }
     for position, turn in enumerate(turns):
@@ -83,15 +94,33 @@ def _build_standard_farm(task):
         }
     nodes.update(
         {
+            # 结算链 = 点屏 ⇄ 下一步 双节点互相/自环循环（下一步界面可能
+            # 连续出现多个，如活动点数报酬），链尾不放选助战——它不会出现
+            # 在结算画面里，只作为下一循环的入口由连续出击或 worker 路由。
+            # store_end：结算画面点完、画面上不再有候选（持续超过宽限期）
+            # 时正常结束本次图执行
             "结算点屏": {
                 "template": _T_TOUCH,
                 "region": "下",
-                "next": ["结算点屏", "结算下一步"],
+                "store_end": "remaining",
+                "next": ["结算点屏", "结算下一步", "连续出击"],
+                # 周回外壳节点标记：无子步骤，执行进度落在「收尾」锚点行
+                "_phase": "收尾",
             },
             "结算下一步": {
                 "template": _T_NEXT,
                 "region": "右下",
-                "next": ["结算点屏", "选助战"],
+                "store_end": "remaining",
+                "next": ["结算点屏", "结算下一步", "连续出击"],
+                "_phase": "收尾",
+            },
+            # 连续出击：结算后出现且还有剩余轮数时点击 = 开启下一循环，
+            # 随后尝试匹配选助战开始新一轮；次数耗尽时视为不存在不点击
+            "连续出击": {
+                "template": _T_CONTINUOUS,
+                "store_gate": "remaining",
+                "next": ["选助战"],
+                "_phase": "收尾",
             },
         }
     )
@@ -139,11 +168,14 @@ def _battle_steps(battle):
         # cards = 选卡槽位序列，每个槽位一次识别点击：
         #   字符串 → 单一目标；数组 → 目标范围（multi 取最靠前的一个命中）；
         #   {np: 名} → 宝具。已选中的卡会出现选中标记，置信度下降不再命中，
-        #   因此相邻槽位的候选范围可以安全重叠
+        #   因此相邻槽位的候选范围可以安全重叠。槽位间隔压到 0.5 秒
+        #   （默认 1.0）；攻击按钮不在此列，点击后保留完整间隔等发牌动画
         for entry in cards:
             if isinstance(entry, dict) and entry.get("np"):
                 # 宝具点击后紧接选卡，无需中央点击
-                steps.append({"template": f"宝具/{entry['np']}"})
+                steps.append(
+                    {"template": f"宝具/{entry['np']}", "step_interval": _CARD_STEP_INTERVAL}
+                )
                 continue
             names = [entry] if isinstance(entry, str) else entry
             if (
@@ -157,17 +189,32 @@ def _battle_steps(battle):
                 )
             templates = ",".join(f"基本/{name.strip()}" for name in names)
             if len(names) == 1:
-                steps.append({"template": templates})
+                steps.append(
+                    {"template": templates, "step_interval": _CARD_STEP_INTERVAL}
+                )
             else:
-                steps.append({"template": templates, "mode": "multi", "count": 1})
+                steps.append(
+                    {
+                        "template": templates,
+                        "mode": "multi",
+                        "count": 1,
+                        "step_interval": _CARD_STEP_INTERVAL,
+                    }
+                )
     return steps
 
 
-# 技能条目 → 子步骤列表：本体点击 + 可选 target 子步骤（选目标 + 中央点击）。
-# 技能条目只支持 pool / master / const；target 不是独立条目，而是挂在条目上的子步骤字段
+# 技能条目 → 子步骤列表：本体点击 + 可选 target 子步骤（选目标 + 延后双击）。
+# 技能条目只支持 pool / master / const；target 不是独立条目，而是挂在条目上的子步骤字段。
+# 动画加速内化为双击 / 延后双击，不再生成显式的 Center 点击步骤
 def _skill_steps(skill):
     if not isinstance(skill, dict):
         raise ValueError(f"Skill entry must be a mapping, got {skill!r}")
+    if skill.get("center") is not None:
+        raise ValueError(
+            f"'center' field is removed; animation acceleration is applied "
+            f"automatically (double / delayed double): {skill!r}"
+        )
 
     # const：常量基础步骤——无识别的固定点击（命名坐标点等），原样透传，
     # 不参与动画加速分派
@@ -175,6 +222,11 @@ def _skill_steps(skill):
         value = skill["const"]
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"Skill entry 'const' must be a non-empty value: {skill!r}")
+        if value.strip().casefold() == "center":
+            raise ValueError(
+                f"'Center' is a reserved internal constant and cannot be "
+                f"written in yaml: {skill!r}"
+            )
         return [{"template": value.strip()}]
 
     step = {}
@@ -206,22 +258,34 @@ def _skill_steps(skill):
         body = {"template": f"Master{master_number}"}
         steps.append(body)
 
-    mode = _center_mode(skill)
-    if mode == "double":
-        # 第一击触发技能，第二击加速动画播放：省掉单独的中央点击
-        body["double"] = True
-    if mode == "tap":
-        steps.append({"template": "Center"})
-
     target = skill.get("target")
     if target:
-        if not isinstance(target, str) or not target.strip():
+        # target 支持单个名字或名字列表：列表时 multi 模式取屏幕最靠前的
+        # 一个命中（与 cards 数组槽位语义一致），可兼容不同灵基立绘
+        if isinstance(target, str):
+            names = [target.strip()]
+        elif isinstance(target, list):
+            names = [name.strip() if isinstance(name, str) else "" for name in target]
+        else:
+            names = []
+        if not names or not all(names):
             raise ValueError(
-                f"Skill entry 'target' must be a non-empty name: {skill!r}"
+                f"Skill entry 'target' must be a non-empty name or a list "
+                f"of names: {skill!r}"
             )
-        # target 子步骤：单击选目标，动画在选完后才开始播，补中央点击加速播放
-        steps.append({"template": f"角色池/{target.strip()}"})
-        steps.append({"template": "Center"})
+        # target 子步骤：单击选目标，动画在选完后才开始播，
+        # 延后补第二击加速播放（延后双击）
+        target_step = {
+            "template": ",".join(f"角色池/{name}" for name in names),
+            "double": TARGET_DOUBLE_DELAY,
+        }
+        if len(names) > 1:
+            target_step["mode"] = "multi"
+            target_step["count"] = 1
+        steps.append(target_step)
+    else:
+        # 无 target：双击本体——第一击触发技能，第二击加速动画播放
+        body["double"] = True
     return steps
 
 
@@ -243,19 +307,6 @@ def _master_number(skill):
             f"in the master menu), got {value!r}: {skill!r}"
         )
     return number
-
-
-# 动画加速方式分派（默认规则见 docs/task-yaml.md「标准周回 flow」）：
-#   "double" — 双击该条目，第二击加速动画播放；"tap" — 单击后补屏幕中央点击；
-#   "none" — 都不要。显式 center 字段覆盖默认
-def _center_mode(skill):
-    center = skill.get("center")
-    if center is None:
-        # 带 target 的条目只单击：本体只是打开目标菜单，无动画可加速
-        return "none" if skill.get("target") else "double"
-    if center in ("double", "tap", "none"):
-        return center
-    return "tap" if center else "none"
 
 
 _FLOWS[FLOW_STANDARD_FARM] = _build_standard_farm

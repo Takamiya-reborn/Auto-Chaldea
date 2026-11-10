@@ -1,7 +1,14 @@
 # FGO 配色、调色板与外部 QSS 加载
 
+from PySide6.QtCore import QEvent, QObject
 from PySide6.QtGui import QColor, QPalette
-from PySide6.QtWidgets import QProxyStyle, QStyle
+from PySide6.QtWidgets import (
+    QGraphicsDropShadowEffect,
+    QPushButton,
+    QProxyStyle,
+    QStyle,
+    QToolButton,
+)
 
 from auto_chaldea.utils.paths import APP_QSS
 
@@ -65,9 +72,36 @@ class _AnimationProxyStyle(QProxyStyle):
         return super().styleHint(hint, option, widget, return_data)
 
 
+# 游戏内按钮统一的投影参数：四周均匀扩散的正投影（无偏移）
+_SHADOW_BLUR = 10
+_SHADOW_OFFSET_X = 0
+_SHADOW_OFFSET_Y = 0
+_SHADOW_COLOR = QColor(18, 34, 54, 130)
+
+
+# 应用级事件过滤器：任何按钮首次显示时自动挂上投影特效。
+# QSS 不支持 box-shadow，只能用 QGraphicsDropShadowEffect 逐个部件实现；
+# 走事件过滤器而不是逐处创建按钮时手挂，保证对话框等后建的按钮也生效。
+class _ButtonShadowInstaller(QObject):
+    def eventFilter(self, obj, event):
+        if event.type() in (QEvent.Show, QEvent.ShowToParent) and obj.isWidgetType():
+            if isinstance(obj, (QPushButton, QToolButton)) and obj.graphicsEffect() is None:
+                effect = QGraphicsDropShadowEffect(obj)
+                effect.setBlurRadius(_SHADOW_BLUR)
+                effect.setOffset(_SHADOW_OFFSET_X, _SHADOW_OFFSET_Y)
+                effect.setColor(_SHADOW_COLOR)
+                obj.setGraphicsEffect(effect)
+        return False
+
+
 # 应用 Fusion 风格 + FGO 调色板 + 全局样式表
 def apply_theme(app):
     app.setStyle(_AnimationProxyStyle("fusion"))
+
+    # 给每个按钮挂 FGO 风投影（过滤器存到 app 属性上防止被回收）
+    shadow_installer = _ButtonShadowInstaller(app)
+    app.setProperty("buttonShadowInstaller", shadow_installer)
+    app.installEventFilter(shadow_installer)
 
     c = FGO
     palette = QPalette()

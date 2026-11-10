@@ -1,6 +1,6 @@
 task_name: 日常虐菜
 prerequisite: 1号位所长，2号位摩根，三号位杀狐，御主穿CD服
-flow: 标准周回
+type: flow
 turns:
   1:
     skills:

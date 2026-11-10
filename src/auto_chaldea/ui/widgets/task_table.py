@@ -1,10 +1,11 @@
 # 任务步骤和执行结果表格
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor
+from PySide6.QtGui import QBrush, QColor
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QHeaderView,
+    QStyledItemDelegate,
     QTableWidget,
     QTableWidgetItem,
 )
@@ -12,7 +13,24 @@ from PySide6.QtWidgets import (
 from auto_chaldea.ui.common.theme import FGO
 from auto_chaldea.ui.widgets.hex_scrollbar import install_hex_scrollbars
 
-HEADERS = ("#", "模板", "匹配序号", "区域", "模式", "结果")
+HEADERS = ("#", "步骤", "匹配序号", "区域", "模式", "结果")
+
+_RUNNING_BG = QColor(FGO["attention"])  # 执行中行底的琥珀金
+
+
+# 执行中行的底色由委托自绘。QSS 存在 QTableWidget::item 规则时
+# QStyleSheetStyle 会忽略 item 的 BackgroundRole，setBackground 无效
+class _RunningRowDelegate(QStyledItemDelegate):
+    def __init__(self, table):
+        super().__init__(table)
+        self._table = table
+
+    def paint(self, painter, option, index):
+        if index.row() == self._table._running_row:
+            brush = QBrush(_RUNNING_BG)
+            painter.fillRect(option.rect, brush)
+            option.backgroundBrush = brush
+        super().paint(painter, option, index)
 
 
 # 显示步骤并提供结果更新接口
@@ -25,6 +43,7 @@ class TaskStepTable(QTableWidget):
         self.setSelectionMode(QAbstractItemView.SingleSelection)
         self.verticalHeader().setVisible(False)
         self.setAlternatingRowColors(True)
+        self.setItemDelegate(_RunningRowDelegate(self))
         install_hex_scrollbars(self)
         self._running_row = None
 
@@ -62,8 +81,8 @@ class TaskStepTable(QTableWidget):
             item.setText(text)
             item.setForeground(QColor(color))
 
-    # 金琥珀底高亮执行中的行并滚动到可见位置；写 BackgroundRole
-    # 不受选中样式影响（选中底色与表格奶油底几乎同色，无法指示）
+    # 高亮执行中的行并滚动到可见位置。行底色由 _RunningRowDelegate 自绘
+    # （琥珀金，与奶油表格底拉开差距）；这里只管字重和结果列文字颜色
     def set_running_row(self, row):
         if row == self._running_row:
             return
@@ -72,15 +91,19 @@ class TaskStepTable(QTableWidget):
         if row is None or not 0 <= row < self.rowCount():
             return
 
-        highlight = QColor(FGO["run_top"])
+        text = QColor(FGO["text_on_cream"])
         for column in range(self.columnCount()):
             item = self.item(row, column)
             if item is None:
                 continue
-            item.setBackground(highlight)
+            # 结果列默认是弱化灰，压在琥珀底上含糊不清，高亮期间一并转藏青
+            item.setForeground(text)
             font = item.font()
             font.setBold(True)
             item.setFont(font)
+        first = self.item(row, 0)
+        if first is not None:
+            self.scrollToItem(first, QAbstractItemView.EnsureVisible)
         first = self.item(row, 0)
         if first is not None:
             self.scrollToItem(first, QAbstractItemView.EnsureVisible)
@@ -96,7 +119,9 @@ class TaskStepTable(QTableWidget):
             item = self.item(self._running_row, column)
             if item is None:
                 continue
-            item.setData(Qt.BackgroundRole, None)
+            # 高亮时把结果列转成了藏青，取消高亮后还原弱化灰
+            if column == len(HEADERS) - 1 and item.text() == "—":
+                item.setForeground(QColor("#8a97b5"))
             font = item.font()
             font.setBold(False)
             item.setFont(font)
