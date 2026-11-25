@@ -1,12 +1,12 @@
 task_name: 90+
 prerequisite: 1号位所长，2号位摩根，三号位杀狐，御主穿CD服
+troop: [所长, 摩根, 杀狐]
 type: flow
 turns:
   1:
     skills:
       - skill: 所长/2
-      - skill: 所长/3
-        index: 1
+      - skill: 所长/3 # 原写法 index:1 实际点的是杀狐S3（全体充能），如需充能改为 杀狐/3
         target: 奥尔加玛丽/1
     cards:
       - np: 既已过去的人理之终
@@ -16,8 +16,7 @@ turns:
     skills:
       - skill: 所长/1
       - skill: 摩根/1
-      - skill: 摩根/2
-        index: 1
+      - skill: 摩根/2 # 原 index:1 与字面语义一致
         target: 奥尔加玛丽/1
       - skill: 杀狐/1
         target: 奥尔加玛丽/1
@@ -30,8 +29,7 @@ turns:
     skills:
       - skill: 所长/2
         target: 奥尔加玛丽/1
-      - skill: 所长/1
-        region: 左下
+      - skill: 所长/1 # 原 region: 左下
     cards:
       - np: 既已过去的人理之终
       - buster

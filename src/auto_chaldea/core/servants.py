@@ -160,7 +160,8 @@ def load_servants(force=False):
 
 
 def resolve_skill(ref):
-    # "名字/技能号" 或 "名字/技能组/技能号" → {"templates": [...], "label": 原文}
+    # "名字/技能号" 或 "名字/技能组/技能号" →
+    # {"templates": [...], "label": 原文, "servant": 角色名}
     db = load_servants()
     parts = [part.strip() for part in str(ref).split("/")]
     if len(parts) == 2:
@@ -209,7 +210,32 @@ def resolve_skill(ref):
             f"skill 引用 {ref!r}：{servant.name} 的技能{slot}图标未登记"
             f"（{servant.path.name}），请先补 技能池 截图并填入档案"
         )
-    return {"templates": templates, "label": str(ref).strip()}
+    return {"templates": templates, "label": str(ref).strip(), "servant": servant.name}
+
+
+def resolve_troop(entries):
+    # troop 字段 → 归一化名/别称 → 位次列表（1 起）。
+    # 位次 = 队伍顺序（1-3 人），决定技能栏分区（1/2/3号位）；同名多副本
+    # （自出 + 助战）合法，此时一个名字对应多个位次，
+    # 引用其技能时须写 "N号位名字/技能号" 前缀消歧
+    if not isinstance(entries, list) or not 1 <= len(entries) <= 3:
+        raise ValueError(
+            f"troop 须为位次顺序的从者名列表（1-3 人）: {entries!r}"
+        )
+    db = load_servants()
+    positions = {}
+    for position, entry in enumerate(entries, 1):
+        if not isinstance(entry, str) or not entry.strip():
+            raise ValueError(f"troop 第{position}位须为从者名: {entry!r}")
+        servant = db.resolve(entry)
+        if servant is None:
+            raise ValueError(
+                f"troop 第{position}位 {entry!r}：未登记的角色，"
+                f"已登记：{db.registered_keys()}"
+            )
+        for key in servant.keys():
+            positions.setdefault(normalize_name(key), []).append(position)
+    return positions
 
 
 def resolve_target(ref):

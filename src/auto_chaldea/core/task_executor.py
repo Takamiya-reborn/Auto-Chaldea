@@ -129,6 +129,14 @@ def _step_float(step, key, default):
     return default if value in (None, "") else float(value)
 
 
+# 匹配结果 → 调试日志：命中数 + 各匹配的坐标与置信度（最多列 5 个），
+# 共享图标跨从者多实例时点错位置，靠这行日志一眼定位
+def _describe_matches(matches, limit=5):
+    parts = [f"({m['x']},{m['y']},{m['confidence']:.2f})" for m in matches[:limit]]
+    more = f", +{len(matches) - limit} more" if len(matches) > limit else ""
+    return f"命中{len(matches)}个: " + ", ".join(parts) + more
+
+
 # 单击 + 可选双击：第二击落在动画播放中，用于加速动画播放。
 # double: true → 双击（间隔 DOUBLE_CLICK_INTERVAL）；double: 数字 →
 # 延后双击，第一击后延迟该秒数再补第二击（如选完技能目标、动画开始后）
@@ -337,6 +345,7 @@ def execute_step(
             return SKIP_RESULT
         if matches is None:
             return TIMEOUT_RESULT
+        print(f"[task] step templates={template_paths} {_describe_matches(matches)}")
         result = False
         for target in matches:
             # multi 步骤同样支持 double / 延后双击（逐个点击目标时生效）
@@ -373,6 +382,7 @@ def execute_step(
         return SKIP_RESULT
     if matches is None:
         return TIMEOUT_RESULT
+    print(f"[task] step template={template_path} {_describe_matches(matches)}")
     if mode == "none":
         if step_interval:
             sleep_fn(step_interval)

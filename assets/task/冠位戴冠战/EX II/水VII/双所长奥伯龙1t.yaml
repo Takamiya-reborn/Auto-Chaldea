@@ -1,28 +1,25 @@
 task_name: 水所长VII 100 ★★★
 prerequisite: 1t，1号位自出3灵基所长，2号位奥伯龙，三号位助战1、2灵基所长，御主穿战斗服，会开决战强化
+# 自出所长与助战所长同名，占 1、3 两个位次，技能引用用 N号位 前缀消歧。
+# 注意：原写法「所长/3 index:0 target」依赖灰色图标过滤，实际点的是
+# 奥伯龙的 S3（2号位），迁移后按实际行为改写为 奥伯龙/3
+troop: [所长, 奥伯龙, 所长]
 type: flow
 turns:
   1:
     skills:
       - master: 1 # 战斗服・决战强化
       - skill: 奥伯龙/1
-      - skill: 所长/2
-        index: 0
-        region: 左下
-      - skill: 所长/3
-        index: 0
-      - skill: 所长/1
-        region: 左下
+      - skill: 1号位所长/2
+      - skill: 1号位所长/3
+      - skill: 1号位所长/1
       - skill: 奥伯龙/2
-        index: 0
-        region: 左下
         target: [奥尔加玛丽/1, 奥尔加玛丽/2] # 1/2 灵基立绘任一
-      - skill: 所长/3
-        index: 0
+      - skill: 奥伯龙/3
         target: [奥尔加玛丽/1, 奥尔加玛丽/2]
-      - skill: 所长/3
-      - skill: 所长/2
-      - skill: 所长/1
+      - skill: 3号位所长/3
+      - skill: 3号位所长/2
+      - skill: 3号位所长/1
     cards:
       - np: 既已过去的人理之终
       - buster

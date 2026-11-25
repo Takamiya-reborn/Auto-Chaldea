@@ -21,6 +21,12 @@ REGION_ALIASES = {
         DEFAULT_SCREEN_WIDTH // 2,
         DEFAULT_SCREEN_HEIGHT,
     ),
+    # 从者技能栏分区（由 flow 的 troop 字段按位次自动生成，yaml 不手写）。
+    # 技能池图标全队通用，必须分区避免跨从者误命中。
+    # 1280x720 基准，实测图标中心：74/162/250、392/480/568、709/797/885
+    "1号位": (40, 480, 320, 720),
+    "2号位": (330, 480, 620, 720),
+    "3号位": (640, 480, 940, 720),
     "右下": (
         DEFAULT_SCREEN_WIDTH // 2,
         DEFAULT_SCREEN_HEIGHT // 2,

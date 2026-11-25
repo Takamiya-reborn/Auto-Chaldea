@@ -1,19 +1,15 @@
 task_name: 90+
 prerequisite: 1号位所长，2号位仇龙娘，御主穿CD服
+troop: [所长, 终龙娘]
 type: flow
 turns:
   1:
     skills:
-      - skill: 所长/2
-        region: 左
-      - skill: 所长/3
-        region: 左
-      - skill: 所长/1
-        region: 左
-      - skill: 所长/2
-        region: 左
-      - skill: 终龙娘/2
-        region: 左
+      - skill: 所长/2 # 原 region: 左
+      - skill: 所长/3 # 原 region: 左
+      - skill: 所长/1 # 原 region: 左
+      - skill: 所长/2 # 原 region: 左
+      - skill: 终龙娘/2 # 原 region: 左
       - const: Enemy1
     cards: [arts, quick, arts]
   2:

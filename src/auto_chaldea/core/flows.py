@@ -1,6 +1,8 @@
 # 内置标准流程图：把周回外壳（助战 → 开始 → 战斗 → 结算）沉淀为
 # 代码内置的图模板，任务文件只写每回合脚本。DSL 规则见 docs/task-yaml.md「标准周回 flow」
 
+import re
+
 from auto_chaldea.core import servants
 
 FLOW_STANDARD_FARM = "标准周回"
@@ -65,6 +67,9 @@ def _build_standard_farm(task):
         raise ValueError(
             f"'turns' keys must be consecutive turns starting at 1: {turns}"
         )
+    # troop：三个位次的从者名（名字或别称），决定技能栏分区。技能池图标
+    # 全队通用，skill 条目必须按位次分区，否则共享图标会跨从者误命中
+    troop = servants.resolve_troop(task.get("troop"))
 
     # 连刷次数由 UI 的执行次数输入驱动，存于共享状态仓（remaining = 尚未
     # 开始的轮数）。一次循环的边界：起始 = 选助战命中；结束 = 命中连续出击
@@ -101,7 +106,7 @@ def _build_standard_farm(task):
             "template": _T_ATTACK,
             "region": "右下",
             "action": "none",
-            "steps": _battle_steps(turn_map[turn]),
+            "steps": _battle_steps(turn_map[turn], troop),
             "next": next_candidates,
         }
     nodes.update(
@@ -188,8 +193,9 @@ def _battle_node(position):
     return f"战斗{position}"
 
 
-# 回合脚本条目 → 节点子步骤列表（复用 task_executor 的步骤语法）
-def _battle_steps(battle):
+# 回合脚本条目 → 节点子步骤列表（复用 task_executor 的步骤语法）。
+# troop：归一化名/别称 → 位次列表，skill 条目按位次生成技能栏分区
+def _battle_steps(battle, troop):
     if not isinstance(battle, dict):
         raise ValueError(f"Battle entry must be a mapping, got {battle!r}")
     if battle.get("attack") is not None:
@@ -205,7 +211,7 @@ def _battle_steps(battle):
     skills = battle.get("skills") or []
     steps = []
     for skill in skills:
-        steps.extend(_skill_steps(skill))
+        steps.extend(_skill_steps(skill, troop))
 
     cards = battle.get("cards")
     if cards:
@@ -271,9 +277,12 @@ def _battle_steps(battle):
 
 
 # 技能条目 → 子步骤列表：本体点击 + 可选 target 子步骤（选目标 + 延后双击）。
-# 技能条目只支持 pool / master / const；target 不是独立条目，而是挂在条目上的子步骤字段。
-# 动画加速内化为双击 / 延后双击，不再生成显式的 Center 点击步骤
-def _skill_steps(skill):
+# 技能条目只支持 skill / master / const；target 不是独立条目，而是挂在条目上的子步骤字段。
+# 动画加速内化为双击 / 延后双击，不再生成显式的 Center 点击步骤。
+# troop：归一化名/别称 → 位次列表。skill 条目的识别区域自动限定为该从者
+# 位次的技能栏分区（技能池图标全队通用，不分区会跨从者误命中）；
+# 同名多副本（自出 + 助战）用 "N号位名字/技能号" 前缀消歧
+def _skill_steps(skill, troop):
     if not isinstance(skill, dict):
         raise ValueError(f"Skill entry must be a mapping, got {skill!r}")
     if skill.get("center") is not None:
@@ -281,6 +290,14 @@ def _skill_steps(skill):
             f"'center' field is removed; animation acceleration is applied "
             f"automatically (double / delayed double): {skill!r}"
         )
+    # 位次分区替代手写定位：index 随匹配数漂移（灰色图标、其他从者的同款
+    # 图标都会改变匹配列表），手填 region 坐标易错且每个任务重复
+    for field in ("index", "region"):
+        if skill.get(field) is not None:
+            raise ValueError(
+                f"skill 条目不再支持 {field!r}：troop 声明位次后按从者自动限定"
+                f"技能栏分区；同名多副本用 N号位 前缀消歧（如 1号位所长/2）: {skill!r}"
+            )
 
     # const：常量基础步骤——无识别的固定点击（命名坐标点等），原样透传，
     # 不参与动画加速分派
@@ -306,8 +323,12 @@ def _skill_steps(skill):
         )
     if skill.get("skill") is not None:
         # 角色引用 → 技能池模板（角色档案解析，见 servants）；多图标变体并列
-        # 时任一命中，与 target 列表语义一致
-        resolved = servants.resolve_skill(skill["skill"])
+        # 时任一命中，与 target 列表语义一致。名字可带 N号位 前缀指定副本
+        ref, position = _split_position_prefix(str(skill["skill"]))
+        resolved = servants.resolve_skill(ref)
+        zone = _troop_zone(
+            resolved["servant"], position, troop, skill["skill"]
+        )
         if len(resolved["templates"]) == 1:
             step["template"] = resolved["templates"][0]
         else:
@@ -315,8 +336,8 @@ def _skill_steps(skill):
             step["mode"] = "multi"
             step["count"] = 1
         step["_label"] = resolved["label"]
-        # 技能池图标固定在屏幕底部，缺省 region 下；个别技能在左侧时条目覆盖
-        step.setdefault("region", "下")
+        # 识别区域 = 该从者位次的技能栏分区（区域别名见 task_schema）
+        step["region"] = f"{zone}号位"
     elif skill.get("master") is not None:
         master_number = _master_number(skill)
         step["template"] = _T_MASTER
@@ -328,9 +349,8 @@ def _skill_steps(skill):
             f"(target is a sub-step field on the entry): {skill!r}"
         )
 
-    for field in ("index", "region", "threshold"):
-        if skill.get(field) is not None:
-            step[field] = skill[field]
+    if skill.get("threshold") is not None:
+        step["threshold"] = skill["threshold"]
 
     steps = [step]
     body = step
@@ -378,6 +398,42 @@ def _skill_steps(skill):
         # 无 target：双击本体——第一击触发技能，第二击加速动画播放
         body["double"] = True
     return steps
+
+
+# skill 引用的名字段剥出位次前缀："1号位所长/2" → ("所长/2", 1)。
+# 前缀可省略；位次合法性由 _troop_zone 对照 troop 校验
+def _split_position_prefix(ref):
+    parts = [part.strip() for part in ref.split("/")]
+    match = re.fullmatch(r"([1-3])号位(.+)", parts[0])
+    if match:
+        parts[0] = match.group(2).strip()
+        return "/".join(parts), int(match.group(1))
+    return "/".join(parts), None
+
+
+# 从者 → 技能栏分区位次：对照 troop 校验。同名多副本（一个名字占多个位次）
+# 时必须带 N号位 前缀；写前缀则校验该位次确实是该从者
+def _troop_zone(servant_name, position, troop, original_ref):
+    positions = troop.get(servants.normalize_name(servant_name)) or []
+    if not positions:
+        raise ValueError(
+            f"skill 引用 {original_ref!r}：{servant_name!r} 不在 troop 中，"
+            f"请把该从者加进 troop 或检查名字"
+        )
+    if position is None:
+        if len(positions) > 1:
+            raise ValueError(
+                f"skill 引用 {original_ref!r}：{servant_name!r} 占 troop 多个位次 "
+                f"{positions}（自出/助战同名副本），请用 N号位 前缀消歧，"
+                f"如 {positions[0]}号位{servant_name!r}"
+            )
+        return positions[0]
+    if position not in positions:
+        raise ValueError(
+            f"skill 引用 {original_ref!r}：troop 的 {position}号位 不是 "
+            f"{servant_name!r}（它在 {positions} 位）"
+        )
+    return position
 
 
 # master 条目取值校验：只能是御主菜单里的技能序号 1/2/3

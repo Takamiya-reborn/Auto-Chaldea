@@ -1,17 +1,16 @@
 task_name: 日常虐菜
-prerequisite: 1号位所长，2号位仇龙娘，三号位杀狐，御主穿CD服
+prerequisite: 1号位所长，2号位仇龙娘，3号位杀狐，御主穿CD服
+troop: [所长, 终结的伊丽莎白, 杀狐]
 type: flow
 turns:
   1:
     skills:
       - skill: 终结的伊丽莎白/1
-        index: 1
       - skill: 终结的伊丽莎白/2
       - skill: 所长/2
       - skill: 杀狐/2
         target: 奥尔加玛丽/1
       - skill: 杀狐/3
-        index: 2
         target: 奥尔加玛丽/1
     cards:
       - np: 既已过去的人理之终
@@ -26,7 +25,6 @@ turns:
         target: 奥尔加玛丽/1
       - skill: 所长/2
       - skill: 所长/3
-        index: 0
     cards:
       - buster
       - quick

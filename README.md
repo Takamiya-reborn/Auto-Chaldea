@@ -32,22 +32,24 @@ Auto-Chaldea 是一个基于 ADB、OpenCV 和 PySide6 的 FGO 自动化辅助工
 - 支持单模板识别和多模板识别
 - 支持按置信度排序、索引点击和重复匹配处理
 - 可配置识别区域、重试间隔和超时
+- 每步识别都会在日志输出命中数量、坐标与置信度，便于排查点错位置的问题
 
 ### 3. YAML 任务系统
 
 - 任务步骤以 YAML 配置，放在 `assets/task/`
 - 每个步骤都可以定义模板、区域、等待、重试与超时
 - 支持 `single` / `multi` / `none` 三种识别模式
-- 允许通过 `Center` 直接点击屏幕中心，跳过模板识别；也支持 `Enemy1` / `Enemy2` / `Enemy3` 等内置坐标点
+- 支持 `Enemy1` / `Enemy2` / `Enemy3` 等内置坐标点（`Center` 为内部保留常量，yaml 不允许编写）
 - 任务执行器会按顺序执行，直到目标出现、点击成功或任务失败
-- 推荐用内置标准周回（`type: flow`）编写任务；手写 `nodes` 节点图（`type: nodes`）客制化程度高但编写难度大，用于特殊流程，编写规则见 [docs/task-yaml.md](docs/task-yaml.md)
+- **从者档案**：技能 / 选目标 / 宝具用角色引用（`skill: 所长/2` 等），由 `data/servants/` 下的档案解析为模板，可用 `scripts/servant.py` 生成档案骨架
+- 推荐用内置标准周回（`type: flow`）编写任务：`troop` 字段声明队伍位次，技能条目按位次自动限定技能栏分区，避免共享图标跨从者误点；手写 `nodes` 节点图（`type: nodes`）客制化程度高但编写难度大，用于特殊流程，编写规则见 [docs/task-yaml.md](docs/task-yaml.md)
 
 ### 4. 桌面化执行界面
 
 - 设备选择与连接控制
 - 任务列表与任务详情查看
 - 实时日志与状态反馈
-- 执行任务前可设置重复执行次数（1 到 9999 次）
+- 执行任务前可设置重复执行次数（1 到 9999 次），并可勾选「使用苹果」
 - 执行过程中显示当前执行次数与总次数
 - 暂停、继续、停止等运行控制
 - 任务执行过程中可查看当前识别结果和动作状态
@@ -68,6 +70,8 @@ Auto-Chaldea 是一个基于 ADB、OpenCV 和 PySide6 的 FGO 自动化辅助工
 ├── README.md                # 项目说明
 ├── docs/
 │   └── task-yaml.md         # 任务 YAML 编写规则
+├── data/
+│   └── servants/            # 从者档案（角色引用 → 技能/立绘/宝具模板）
 ├── src/
 │   └── auto_chaldea/
 │       ├── __init__.py
@@ -75,13 +79,15 @@ Auto-Chaldea 是一个基于 ADB、OpenCV 和 PySide6 的 FGO 自动化辅助工
 │       │   ├── task_executor.py
 │       │   ├── task_loader.py
 │       │   ├── task_schema.py
+│       │   ├── servants.py          # 从者档案解析（技能/选目标/宝具引用）
 │       │   ├── graph_runner.py      # 节点图任务执行
-│       │   ├── flows.py             # 内置标准周回 flow 展开
+│       │   ├── flows.py             # 内置标准周回 flow 展开（troop 分区 / 苹果节点）
 │       │   └── ...
 │       ├── ui/
 │       │   ├── main_window.py
 │       │   ├── task_panel.py
 │       │   ├── task_detail.py
+│       │   ├── runtime/             # worker 线程与执行状态仓
 │       │   └── ...
 │       └── utils/
 │           ├── adb_device.py
@@ -96,6 +102,7 @@ Auto-Chaldea 是一个基于 ADB、OpenCV 和 PySide6 的 FGO 自动化辅助工
 ├── scripts/
 │   ├── scap.py              # 开发用截图脚本，生成模板或校验画面
 │   ├── check.py             # 检查屏幕与模板的最高匹配度
+│   ├── servant.py           # 从 fgo.wiki 生成从者档案骨架
 │   └── ...                  # 其它开发辅助脚本
 └── uv.lock
 ```
@@ -153,12 +160,18 @@ uv run scripts/check.py "Path to template image" --device SERIAL
 
 在任务详情区域点击“执行”后，可在弹窗中输入执行次数，范围为 1 到 9999 次。这里的次数表示完整任务的重复次数，每次都会从第一个步骤重新开始执行。
 
+弹窗中可勾选「使用苹果」：进入副本需要消耗体力，体力不足时游戏会弹出苹果选择窗——勾选后自动按**银苹果优先**点苹果补体力继续刷；不勾选则结束任务，并在状态栏显示实际完成的轮数。
+
 运行期间，状态栏会显示当前执行次数与总次数，并可使用“暂停”、“继续”或“停止”控制任务。任务执行失败或设备断开时会提前终止后续执行。
 
 ## 任务 YAML
 
 任务配置位于 `assets/task/`，推荐用内置标准周回编写（`type: flow`，连刷次数由 UI 的
-「执行次数」输入驱动）；特殊流程可手写 `nodes` 节点图（`type: nodes`），客制化程度高但编写难度大。
+「执行次数」输入驱动）：`troop` 字段按位次声明队伍（如 `troop: [所长, 摩根, 杀狐]`），
+`skill` 条目写角色引用（`skill: 杀狐/3`），由 `data/servants/` 从者档案解析为技能池
+模板并自动限定该位次的技能栏分区——技能池图标全队通用，不分区会跨从者误点；
+同名从者占两位次（自出 + 助战）时用 `1号位所长/2` 这样的前缀消歧。
+特殊流程可手写 `nodes` 节点图（`type: nodes`），客制化程度高但编写难度大。
 完整编写规则、字段说明与示例见 [docs/task-yaml.md](docs/task-yaml.md)。
 
 ## 屏幕帧复用
@@ -181,17 +194,20 @@ uv run scripts/check.py "Path to template image" --device SERIAL
 
 - `main.py`：程序启动入口
 - `src/auto_chaldea/__init__.py`：导出 `main` 与常用执行函数
-- `src/auto_chaldea/core/task_loader.py`：加载任务
+- `src/auto_chaldea/core/task_loader.py`：加载任务（flow 在此展开为节点图）
 - `src/auto_chaldea/core/task_executor.py`：执行任务步骤
+- `src/auto_chaldea/core/graph_runner.py`：沿节点图行走执行
+- `src/auto_chaldea/core/flows.py`：内置标准周回 flow（troop 分区、苹果节点在此展开）
+- `src/auto_chaldea/core/servants.py`：从者档案解析
 - `src/auto_chaldea/utils/adb_device.py`：ADB 设备连接、点击、滑动和尺寸读取
 - `src/auto_chaldea/utils/recognizer.py`：识别逻辑
 - `src/auto_chaldea/ui/`：桌面端界面
 
 ### 2. 添加一个新任务
 
-1. 在 `assets/task/` 下新增 YAML 文件
-2. 将对应模板图片放进 `assets/template/`
-3. 确保模板名和 YAML 中的 `template` 字段一致
+1. 确保队伍中的从者都有档案：缺档时用 `uv run scripts/servant.py <Mooncell页面名>` 生成骨架并补技能/立绘/宝具模板
+2. 在 `assets/task/` 下新增 YAML 文件，`type: flow` 任务写好 `troop` 与每回合的 `skills` / `cards`
+3. 将对应模板图片放进 `assets/template/`，确保与档案/YAML 中的模板名一致
 4. 启动程序后在任务列表中选择并执行
 
 ### 3. 调整识别逻辑
