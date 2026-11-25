@@ -10,14 +10,18 @@ TEMPLATE_DIR = ASSETS_DIR / "template"
 TASK_DIR = ASSETS_DIR / "task"
 QSS_DIR = ASSETS_DIR / "qss"
 APP_QSS = QSS_DIR / "app.qss"
+DATA_DIR = REPO_ROOT / "data"
+SERVANT_DIR = DATA_DIR / "servants"
 
 
 __all__ = [
     "ADB_PATH",
     "APP_QSS",
     "ASSETS_DIR",
+    "DATA_DIR",
     "QSS_DIR",
     "REPO_ROOT",
+    "SERVANT_DIR",
     "TASK_DIR",
     "TEMPLATE_DIR",
 ]

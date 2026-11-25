@@ -4,15 +4,15 @@ type: flow
 turns:
   1:
     skills:
-      - pool: 2
+      - skill: 所长/2
         region: 左
-      - pool: 3
+      - skill: 所长/3
         region: 左
-      - pool: 1
+      - skill: 所长/1
         region: 左
-      - pool: 2
+      - skill: 所长/2
         region: 左
-      - pool: 5
+      - skill: 终龙娘/2
         region: 左
       - const: Enemy1
     cards: [arts, quick, arts]
@@ -25,8 +25,8 @@ turns:
     skills:
       - master: 3
         target: 奥尔加玛丽/1
-      - pool: 2
-      - pool: 1
+      - skill: 所长/2
+      - skill: 所长/1
     cards:
       - np: 既已过去的人理之终
       - buster

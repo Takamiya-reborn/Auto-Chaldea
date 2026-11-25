@@ -111,7 +111,9 @@ def task_step_view(task):
                 continue
             for expanded in expand_named_steps([step]):
                 row = dict(expanded)
-                row["template"] = _step_label(expanded.get("template"))
+                # 技能条目展开时带 _label（角色/技能号），表格优先显示；
+                # 其余按模板路径翻译友好名
+                row["template"] = expanded.get("_label") or _step_label(expanded.get("template"))
                 rows.append(row)
                 node_spans.append(offset)
                 offset += 1

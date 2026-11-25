@@ -1,6 +1,8 @@
 # 内置标准流程图：把周回外壳（助战 → 开始 → 战斗 → 结算）沉淀为
 # 代码内置的图模板，任务文件只写每回合脚本。DSL 规则见 docs/task-yaml.md「标准周回 flow」
 
+from auto_chaldea.core import servants
+
 FLOW_STANDARD_FARM = "标准周回"
 
 # 结算链与战斗节点的公共模板路径
@@ -172,10 +174,16 @@ def _battle_steps(battle):
         #   （默认 1.0）；攻击按钮不在此列，点击后保留完整间隔等发牌动画
         for entry in cards:
             if isinstance(entry, dict) and entry.get("np"):
-                # 宝具点击后紧接选卡，无需中央点击
-                steps.append(
-                    {"template": f"宝具/{entry['np']}", "step_interval": _CARD_STEP_INTERVAL}
-                )
+                # 宝具：角色引用走档案（宝具模板列表，强化改名并列任一命中），
+                # 否则按原始模板名处理；宝具点击后紧接选卡，无需中央点击
+                templates = servants.resolve_np(str(entry["np"]))
+                if templates is None:
+                    templates = [f"宝具/{entry['np']}"]
+                np_step = {"template": ",".join(templates), "step_interval": _CARD_STEP_INTERVAL}
+                if len(templates) > 1:
+                    np_step["mode"] = "multi"
+                    np_step["count"] = 1
+                steps.append(np_step)
                 continue
             names = [entry] if isinstance(entry, str) else entry
             if (
@@ -232,7 +240,21 @@ def _skill_steps(skill):
     step = {}
     master_number = None
     if skill.get("pool") is not None:
-        step["template"] = f"技能池/skill_{skill['pool']}"
+        raise ValueError(
+            f"'pool' is removed; write the skill as 角色/技能号 via 'skill' "
+            f"(character records live in data/servants/): {skill!r}"
+        )
+    if skill.get("skill") is not None:
+        # 角色引用 → 技能池模板（角色档案解析，见 servants）；多图标变体并列
+        # 时任一命中，与 target 列表语义一致
+        resolved = servants.resolve_skill(skill["skill"])
+        if len(resolved["templates"]) == 1:
+            step["template"] = resolved["templates"][0]
+        else:
+            step["template"] = ",".join(resolved["templates"])
+            step["mode"] = "multi"
+            step["count"] = 1
+        step["_label"] = resolved["label"]
         # 技能池图标固定在屏幕底部，缺省 region 下；个别技能在左侧时条目覆盖
         step.setdefault("region", "下")
     elif skill.get("master") is not None:
@@ -274,12 +296,21 @@ def _skill_steps(skill):
                 f"of names: {skill!r}"
             )
         # target 子步骤：单击选目标，动画在选完后才开始播，
-        # 延后补第二击加速播放（延后双击）
+        # 延后补第二击加速播放（延后双击）。
+        # 目标名优先走角色档案解析（角色 → 全部已登记立绘 / 指定形态），
+        # 不是已登记角色时按原始模板路径处理
+        parts = []
+        for name in names:
+            templates = servants.resolve_target(name)
+            if templates is None:
+                parts.append(f"角色池/{name}")
+            else:
+                parts.extend(templates)
         target_step = {
-            "template": ",".join(f"角色池/{name}" for name in names),
+            "template": ",".join(parts),
             "double": TARGET_DOUBLE_DELAY,
         }
-        if len(names) > 1:
+        if len(parts) > 1:
             target_step["mode"] = "multi"
             target_step["count"] = 1
         steps.append(target_step)

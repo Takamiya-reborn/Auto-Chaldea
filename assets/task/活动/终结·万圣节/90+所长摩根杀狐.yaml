@@ -4,8 +4,8 @@ type: flow
 turns:
   1:
     skills:
-      - pool: 2
-      - pool: 3
+      - skill: 所长/2
+      - skill: 所长/3
         index: 1
         target: 奥尔加玛丽/1
     cards:
@@ -14,23 +14,23 @@ turns:
       - [buster, arts, quick]
   2:
     skills:
-      - pool: 1
-      - pool: 5
-      - pool: 2
+      - skill: 所长/1
+      - skill: 摩根/1
+      - skill: 摩根/2
         index: 1
         target: 奥尔加玛丽/1
-      - pool: 4
+      - skill: 杀狐/1
         target: 奥尔加玛丽/1
       - master: 3
         target: 奥尔加玛丽/1
-      - pool: 2
-      - pool: 3
+      - skill: 所长/2
+      - skill: 所长/3
     cards: [buster, quick, arts]
   3:
     skills:
-      - pool: 2
+      - skill: 所长/2
         target: 奥尔加玛丽/1
-      - pool: 1
+      - skill: 所长/1
         region: 左下
     cards:
       - np: 既已过去的人理之终

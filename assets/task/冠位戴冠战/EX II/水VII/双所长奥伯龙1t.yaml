@@ -5,24 +5,24 @@ turns:
   1:
     skills:
       - master: 1 # 战斗服・决战强化
-      - pool: 7
-      - pool: 2
+      - skill: 奥伯龙/1
+      - skill: 所长/2
         index: 0
         region: 左下
-      - pool: 3
+      - skill: 所长/3
         index: 0
-      - pool: 1
+      - skill: 所长/1
         region: 左下
-      - pool: 2
+      - skill: 奥伯龙/2
         index: 0
         region: 左下
         target: [奥尔加玛丽/1, 奥尔加玛丽/2] # 1/2 灵基立绘任一
-      - pool: 3
+      - skill: 所长/3
         index: 0
         target: [奥尔加玛丽/1, 奥尔加玛丽/2]
-      - pool: 3
-      - pool: 2
-      - pool: 1
+      - skill: 所长/3
+      - skill: 所长/2
+      - skill: 所长/1
     cards:
       - np: 既已过去的人理之终
       - buster
