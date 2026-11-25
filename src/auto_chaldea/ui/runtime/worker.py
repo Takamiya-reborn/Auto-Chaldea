@@ -91,11 +91,16 @@ class TaskWorker(QThread):
 
     # 节点图任务执行：while remaining > 0 驱动——每次进入图前消耗一次
     # 开启新一轮，图内连续出击命中可在同一轮图执行里继续开启后续轮；
-    # 节点进度通过信号投递到界面
+    # 节点进度通过信号投递到界面。
+    # end_reason：图内体力不足弹窗节点（不允许用苹果时）命中后写入状态仓
+    # 正常收束本次图执行——回退连续出击消耗的那次剩余轮数（该轮并未真正
+    # 开始），上报实际完成轮数后结束整个任务
     def _run_graph(self, device):
         completed = True
         try:
             while not self._stop_requested.is_set() and self._store.remaining > 0:
+                # 清掉上一轮可能残留的提前结束原因
+                self._store.set("end_reason", None)
                 # 本轮开始：消耗一次剩余次数，run_started 随之发出
                 self._store.decrement("remaining")
                 self._skip_requested.clear()
@@ -118,6 +123,16 @@ class TaskWorker(QThread):
                     store=self._store,
                     progress=progress,
                 )
+                end_reason = self._store.get("end_reason")
+                if end_reason:
+                    # 开启新一轮时已消耗一次剩余，但该轮因体力不足并未开始：
+                    # 回退这次消耗，实际完成轮数 = total - remaining
+                    self._store.set("remaining", self._store.remaining + 1)
+                    finished_runs = self._store.total - self._store.remaining
+                    self.log_message.emit(
+                        f"{end_reason}，实际完成 {finished_runs} 轮，任务结束。"
+                    )
+                    break
                 if result is False:
                     self.log_message.emit(
                         f"第 {self._store.current_run} 轮执行未走完任务图"

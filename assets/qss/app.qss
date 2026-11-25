@@ -225,6 +225,26 @@ QPushButton#stepperButton {
     font-weight: 800;
     padding: 2px;
 }
+/* 使用苹果勾选框 */
+QDialog#runCountDialog QCheckBox {
+    color: #f2ede0;
+    font-weight: 600;
+    spacing: 8px;
+}
+QDialog#runCountDialog QCheckBox::indicator {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255, 255, 255, 0.55);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.12);
+}
+QDialog#runCountDialog QCheckBox::indicator:hover {
+    border-color: #dac254;
+}
+QDialog#runCountDialog QCheckBox::indicator:checked {
+    border-color: #ffe9a8;
+    background: #dac254;
+}
 /* ==== 滚动条 / 分割线 ==== */
 /* 滚动条由 HexScrollBar 全自绘（透明轨道 + 六边形手柄），不走 QSS */
 QSplitter::handle { background-color: rgba(255, 255, 255, 0.4); }

@@ -252,11 +252,14 @@ class TaskDetailView(QWidget):
             return
 
         dialog = ExecutionCountDialog(
-            initial=self._store.get("last_total") or 1, parent=self
+            initial=self._store.get("last_total") or 1,
+            use_apples=bool(self._store.get("last_use_apples")),
+            parent=self,
         )
         if dialog.exec() != ExecutionCountDialog.Accepted:
             return
         execution_total = dialog.value()
+        use_apples = dialog.use_apples()
 
         port = self._port_edit.text().strip()
         if port:
@@ -273,6 +276,12 @@ class TaskDetailView(QWidget):
 
         self._table.clear_results()
         self._store.begin_session(execution_total)
+        # 苹果策略写入状态仓：图内苹果点击节点 gate 于 use_apples，
+        # 体力不足收束节点 gate 于 no_apples，两键互斥恒为 1/0
+        self._store.set("use_apples", 1 if use_apples else 0)
+        self._store.set("no_apples", 0 if use_apples else 1)
+        # 记住勾选状态，下次弹窗沿用
+        self._store.set("last_use_apples", use_apples)
         self._worker = TaskWorker(self._task, port or None, store=self._store)
         self._worker.node_step.connect(self._on_node_step)
         self._worker.skip_consumed.connect(self._on_skip_consumed)
@@ -361,7 +370,12 @@ class TaskDetailView(QWidget):
         self._set_running_state(running=False)
         self._table.clear_running_row()
         if completed:
-            self._set_status("已完成", FGO["success"])
+            if self._store.get("end_reason"):
+                # 体力不足等提前结束的说明已由 worker 写入状态栏（前缀
+                # 「第 X/Y 轮」的 X 在回退剩余轮数后即实际完成轮数），不覆盖
+                pass
+            else:
+                self._set_status("已完成", FGO["success"])
         else:
             self._table.clear_results()
             self._set_status("已停止", FGO["danger"])

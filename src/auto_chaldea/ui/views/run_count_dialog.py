@@ -3,6 +3,7 @@
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtGui import QIntValidator, QPainter
 from PySide6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QHBoxLayout,
     QLabel,
@@ -20,11 +21,12 @@ from auto_chaldea.ui.widgets.textured_background import paint_background
 MIN_COUNT = 1
 MAX_COUNT = 9999
 QUICK_COUNTS = (1, 3, 5, 10)
+APPLE_HINT = "体力不足时使用苹果继续（优先银苹果）"
 
 
-# 步进选择执行轮数；确认后通过 value() 取结果
+# 步进选择执行轮数；确认后通过 value() 取结果，use_apples() 取苹果策略
 class ExecutionCountDialog(QDialog):
-    def __init__(self, initial=MIN_COUNT, parent=None):
+    def __init__(self, initial=MIN_COUNT, use_apples=False, parent=None):
         super().__init__(parent)
         self.setWindowTitle("执行次数 - Auto-Chaldea")
         self.setObjectName("runCountDialog")
@@ -60,6 +62,12 @@ class ExecutionCountDialog(QDialog):
         layout.addLayout(self._build_stepper())
         layout.addSpacing(2)
         layout.addLayout(self._build_quick_buttons())
+        layout.addSpacing(6)
+
+        self._apple_check = QCheckBox(APPLE_HINT, self)
+        self._apple_check.setChecked(use_apples)
+        self._apple_check.setCursor(Qt.PointingHandCursor)
+        layout.addWidget(self._apple_check, alignment=Qt.AlignCenter)
         layout.addSpacing(4)
 
         self._hint_label = QLabel(self._range_hint(), self)
@@ -102,6 +110,11 @@ class ExecutionCountDialog(QDialog):
             return self._clamp(int(text))
         except ValueError:
             return self._count
+
+    # 确认后的苹果策略：勾选 = 体力不足时点苹果补体力继续；
+    # 不勾选 = 体力不足时结束并显示实际完成轮数
+    def use_apples(self):
+        return self._apple_check.isChecked()
 
     # ---- 界面构建 ----
 

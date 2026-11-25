@@ -2,7 +2,7 @@
 # 节点字段与路由规则见 docs/task-yaml.md「节点图任务」一节。
 # store：可选的共享状态仓（鸭子类型，只需 get(key, default) 与
 # decrement(key, by) 两个方法），供 store_gate / store_end 节点字段读写
-# 运行期变量（如剩余周回次数）
+# 运行期变量（如剩余周回次数）；使用 end_reason 节点时还需 set(key, value)
 
 import time
 
@@ -231,9 +231,7 @@ def _visit(
             # 跳过 = 推进图：与超时同路（可选节点优先，否则走自救边）；
             # 都没有时兜底前往第一个候选的 next——用户跳过只推进，不终止任务
             print(f"[graph] skip requested while waiting for {pending}")
-            routed = _route_on_timeout(pending, nodes) or _route_on_skip(
-                pending, nodes
-            )
+            routed = _route_on_timeout(pending, nodes) or _route_on_skip(pending, nodes)
             if routed is not None:
                 return routed
             print(f"[graph] skip with no route available from {pending}")
@@ -290,6 +288,7 @@ def _visit(
         clicker=clicker,
         fixed_clicks=fixed_clicks,
         resolved_steps=resolved_steps,
+        store=store,
         progress=progress,
     )
 
@@ -396,6 +395,7 @@ def _run_node(
     clicker,
     fixed_clicks,
     resolved_steps,
+    store=None,
     progress=None,
 ):
     # 已达 max_times 的超限命中：不执行动作，直接走超限路由
@@ -481,6 +481,16 @@ def _run_node(
             return None
         print(f"[graph] node {name!r} routing on_error_next {on_error}")
         return list(on_error)
+
+    end_reason = node.get("end_reason")
+    if end_reason is not None:
+        # end_reason 节点：命中即宣告本次图执行因该原因提前收束（如体力
+        # 不足弹窗：不允许用苹果时只识别不点击），原因写入状态仓供 worker
+        # 读取后收尾；返回空路由按正常结束收束本次图执行
+        if store is not None:
+            store.set("end_reason", end_reason)
+        print(f"[graph] node {name!r} end_reason={end_reason!r}, ending graph pass")
+        return []
 
     return list(node.get("next") or [])
 

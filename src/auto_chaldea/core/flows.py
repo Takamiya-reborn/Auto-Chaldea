@@ -11,6 +11,9 @@ _T_NEXT = "基本/下一步"
 _T_ATTACK = "基本/attack"
 _T_MASTER = "基本/御主技能"
 _T_CONTINUOUS = "基本/连续出击"
+_T_SILVER_APPLE = "基本/银苹果"
+_T_GOLD_APPLE = "基本/金苹果"
+_T_CONFIRM = "基本/决定"
 # 选卡槽位间的点击间隔（秒）：选中动画较短，压到 0.5 加快选卡节奏
 _CARD_STEP_INTERVAL = 0.5
 
@@ -47,10 +50,13 @@ def expand_flow(task):
 
 # ---- 标准周回 ----
 
+
 def _build_standard_farm(task):
     turn_map = task.get("turns")
     if not isinstance(turn_map, dict) or not turn_map:
-        raise ValueError(f"Flow {FLOW_STANDARD_FARM!r} requires a non-empty 'turns' mapping")
+        raise ValueError(
+            f"Flow {FLOW_STANDARD_FARM!r} requires a non-empty 'turns' mapping"
+        )
     try:
         turns = sorted(int(turn) for turn in turn_map)
     except (TypeError, ValueError) as error:
@@ -64,7 +70,11 @@ def _build_standard_farm(task):
     # 开始的轮数）。一次循环的边界：起始 = 选助战命中；结束 = 命中连续出击
     # （store_gate 消耗一次并回到选助战开启下一轮）或结算画面点完后经
     # store_end 结束本次图执行。worker 侧 while remaining > 0 决定是否
-    # 继续下一轮，因此一轮图执行可覆盖多轮周回
+    # 继续下一轮，因此一轮图执行可覆盖多轮周回。
+    # 苹果策略同样由状态仓驱动：use_apples=1 时苹果点击节点生效
+    # （体力不足弹窗点苹果 + 决定补体力继续）；no_apples=1（不允许用苹果）
+    # 时只识别弹窗即经 end_reason 正常收束，worker 回退本次消耗的轮数并
+    # 上报实际完成轮数。两个键由 UI 在开始执行时写入，互斥
     nodes = {
         "选助战": {
             "template": "助战池/选助战",
@@ -77,7 +87,7 @@ def _build_standard_farm(task):
             "template": "基本/开始任务",
             "region": "右下",
             "timeout": 3,
-            "next": [_battle_node(1)],
+            "next": [_battle_node(1), *_apple_nodes()],
             "_phase": "准备",
         },
     }
@@ -117,16 +127,61 @@ def _build_standard_farm(task):
                 "_phase": "收尾",
             },
             # 连续出击：结算后出现且还有剩余轮数时点击 = 开启下一循环，
-            # 随后尝试匹配选助战开始新一轮；次数耗尽时视为不存在不点击
+            # 随后尝试匹配选助战开始新一轮；次数耗尽时视为不存在不点击。
+            # 点击后游戏判断体力：够 → 直接进选助战；不够 → 弹出苹果
+            # 选择窗，由苹果节点接管
             "连续出击": {
                 "template": _T_CONTINUOUS,
                 "store_gate": "remaining",
-                "next": ["选助战"],
+                "next": ["选助战", *_apple_nodes()],
                 "_phase": "收尾",
             },
+            **_apple_node_map(),
         }
     )
     return {"entry": ["选助战"], "nodes": nodes}
+
+
+# 苹果相关节点的候选列表：银苹果在金苹果之前 = 优先银色
+def _apple_nodes():
+    return ["银苹果", "金苹果", "体力不足银", "体力不足金"]
+
+
+# 苹果节点定义：允许苹果（use_apples）→ 识别到弹窗点苹果（节点 action
+# 默认点击）后子步骤点决定补体力，回选助战继续本轮；不允许（no_apples）
+# → 只识别弹窗不点击，经 end_reason 正常收束本次图执行
+def _apple_node_map():
+    confirm_steps = [{"template": _T_CONFIRM}]
+    return {
+        "银苹果": {
+            "template": _T_SILVER_APPLE,
+            "store_gate": "use_apples",
+            "steps": confirm_steps,
+            "next": ["选助战"],
+            "_phase": "收尾",
+        },
+        "金苹果": {
+            "template": _T_GOLD_APPLE,
+            "store_gate": "use_apples",
+            "steps": confirm_steps,
+            "next": ["选助战"],
+            "_phase": "收尾",
+        },
+        "体力不足银": {
+            "template": _T_SILVER_APPLE,
+            "action": "none",
+            "store_gate": "no_apples",
+            "end_reason": "体力不足",
+            "_phase": "收尾",
+        },
+        "体力不足金": {
+            "template": _T_GOLD_APPLE,
+            "action": "none",
+            "store_gate": "no_apples",
+            "end_reason": "体力不足",
+            "_phase": "收尾",
+        },
+    }
 
 
 def _battle_node(position):
@@ -179,7 +234,10 @@ def _battle_steps(battle):
                 templates = servants.resolve_np(str(entry["np"]))
                 if templates is None:
                     templates = [f"宝具/{entry['np']}"]
-                np_step = {"template": ",".join(templates), "step_interval": _CARD_STEP_INTERVAL}
+                np_step = {
+                    "template": ",".join(templates),
+                    "step_interval": _CARD_STEP_INTERVAL,
+                }
                 if len(templates) > 1:
                     np_step["mode"] = "multi"
                     np_step["count"] = 1
@@ -229,7 +287,9 @@ def _skill_steps(skill):
     if skill.get("const") is not None:
         value = skill["const"]
         if not isinstance(value, str) or not value.strip():
-            raise ValueError(f"Skill entry 'const' must be a non-empty value: {skill!r}")
+            raise ValueError(
+                f"Skill entry 'const' must be a non-empty value: {skill!r}"
+            )
         if value.strip().casefold() == "center":
             raise ValueError(
                 f"'Center' is a reserved internal constant and cannot be "
