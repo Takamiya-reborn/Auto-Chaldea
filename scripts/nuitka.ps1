@@ -22,6 +22,7 @@ $nuitkaArguments = @(
     "--windows-console-mode=disable",
     "--enable-plugins=pyside6",
     "--include-data-dir=assets=assets",
+    "--include-data-dir=data=data",
     "--include-data-files=assets/platform-tools/adb.exe=assets/platform-tools/adb.exe",
     "--include-data-files=assets/platform-tools/AdbWinApi.dll=assets/platform-tools/AdbWinApi.dll",
     "--include-data-files=assets/platform-tools/AdbWinUsbApi.dll=assets/platform-tools/AdbWinUsbApi.dll",
