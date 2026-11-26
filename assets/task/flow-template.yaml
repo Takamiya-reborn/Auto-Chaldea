@@ -1,0 +1,21 @@
+task_name: # 此处添加名字
+prerequisite: # 此处添加描述
+troop: # 此处添加队伍顺序
+type: flow
+turns:
+  1:
+    skills:
+      - skill: # 具体技能 格式：从者名字/技能位次
+      - skill:
+        target: # 单体技能需要选一下目标
+      # ...
+    cards:
+      -  # 第一张卡
+      -  # 第二张卡
+      -  # 第三张卡
+  2:
+    skills:
+    cards:
+  3:
+    skills:
+    cards:

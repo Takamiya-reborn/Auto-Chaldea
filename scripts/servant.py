@@ -1,6 +1,6 @@
 # 从 Mooncell 生成从者档案骨架：python scripts/servant.py <Mooncell页面名>
 # 参数即 https://fgo.wiki/w/<参数> 的页面名（支持重定向页，如 杀狐 → 光之高扬斯卡娅）。
-# 自动字段：名称/别称/职介/灵基名单/技能名注释/宝具名
+# 自动字段：名称/别称/职介/灵基名单/技能名注释
 # 人工字段：立绘/图标/模板 映射（骨架里全部 null，生成后按提示补截图归属）
 #
 #   python scripts/servant.py 光之高扬斯卡娅            # 生成档案
@@ -45,9 +45,7 @@ def api(params):
 
 def fetch_wikitext(page):
     # 参数 = /w/<页面名>；redirects=1 使命名页（杀狐等别称页）落到正式从者页
-    data = api(
-        {"action": "parse", "page": page, "prop": "wikitext", "redirects": "1"}
-    )
+    data = api({"action": "parse", "page": page, "prop": "wikitext", "redirects": "1"})
     parse = data.get("parse") or {}
     text = (parse.get("wikitext") or {}).get("*") or ""
     if data.get("error") or not text:
@@ -91,9 +89,7 @@ def parse_skill_names(text):
     # '''技能N（开放条件）''' 标记槽位；{{持有技能|分类|中文名|...}} 收集中文名，
     # 同槽位多个 = 强化链（含 Mooncell tabber 分形态描述）
     slots, current = {}, None
-    pattern = re.compile(
-        r"'''\s*技能(\d)（|\{\{持有技能\|([^|\n]*)\|([^|\n]*)\|"
-    )
+    pattern = re.compile(r"'''\s*技能(\d)（|\{\{持有技能\|([^|\n]*)\|([^|\n]*)\|")
     for match in pattern.finditer(text):
         if match.group(2) is None:
             current = match.group(1)
@@ -115,7 +111,9 @@ def parse_servant(title, text):
     class_name = (base.get("职阶") or "").strip()
     if not class_name:
         raise SystemExit(f"页面 {title!r} 缺少 职阶 字段")
-    aliases = [a.strip() for a in re.split(r"[,，、]", base.get("昵称") or "") if a.strip()]
+    aliases = [
+        a.strip() for a in re.split(r"[,，、]", base.get("昵称") or "") if a.strip()
+    ]
 
     # 各阶段显示名：优先中文卡面名N（不同阶段不同名字的从者，如 U－奥尔加玛丽）
     battle_name = base.get("中文战斗名") or name
@@ -145,12 +143,6 @@ def parse_servant(title, text):
     if not stages:
         stages = [{"阶段": None, "名称": battle_name.strip()}]
 
-    np_names = []
-    for block in template_blocks(text, "{{宝具\n"):
-        value = block_params(block).get("中文名")
-        if value and value not in np_names:
-            np_names.append(value)
-
     return {
         "name": name,
         "class": class_name,
@@ -158,16 +150,12 @@ def parse_servant(title, text):
         "stages": stages,
         "extras": extras,
         "skills": parse_skill_names(text),
-        "nps": np_names,
-        "tabber": "<tabber>" in text.split("===持有技能===", 1)[-1],
     }
 
 
 def build_yaml(info):
     lines = [
-        f"# 从者档案：{info['name']}（由 scripts/servant.py 从 Mooncell 生成）",
-        "# 自动字段：名称/别称/职介/灵基名单/宝具名",
-        "# 人工字段：立绘/图标/模板 映射（null = 待截图登记），灵衣条目的 名称 待确认",
+        f"# 从者档案：{info['name']}（由 scripts/servant.py 生成，截图归属待人工登记）",
         "",
         f"名称: {info['name']}",
     ]
@@ -175,21 +163,17 @@ def build_yaml(info):
         lines.append(f"别称: [{', '.join(info['aliases'])}]")
     lines.append(f"职介: {info['class']}")
     lines.append("")
-    lines.append("# target 立绘所在目录：角色池/<此名>/，与实际模板目录不符时修改这里")
     lines.append(f"角色池目录: {info['name']}")
     lines.append("")
     lines.append("灵基:")
     for stage in info["stages"]:
-        label = f"   # 第{stage['阶段']}阶段" if stage["阶段"] else ""
-        lines.append(f"  - {{ 名称: {stage['名称']}, 立绘: null }}{label}")
+        lines.append(f"  - {{ 名称: {stage['名称']}, 立绘: null }}")
     for label in info["extras"]:
         lines.append(
             f"  - {{ 名称: {info['stages'][0]['名称']}, 立绘: null }}"
-            f"   # 灵衣/变体：{label}，名称待确认"
+            f"   # 灵衣/变体：{label}"
         )
     lines.append("")
-    if info["tabber"]:
-        lines.append("# 注意：Mooncell 技能含分形态描述，灵基切换技能组时请按组改写本节")
     lines.append("技能:")
     for slot in ("1", "2", "3"):
         names = info["skills"].get(slot) or []
@@ -197,12 +181,7 @@ def build_yaml(info):
         lines.append(f"  {slot}: null{comment}")
     lines.append("")
     lines.append("宝具:")
-    if info["nps"]:
-        lines.append(f"  名: [{', '.join(info['nps'])}]")
-        lines.append(f"  模板: null   # → 宝具/{info['nps'][0]}.png，待截图")
-    else:
-        lines.append("  名: []")
-        lines.append("  模板: null   # 未在页面中找到宝具名，待人工补")
+    lines.append("  模板: null")
     return "\n".join(lines) + "\n"
 
 
