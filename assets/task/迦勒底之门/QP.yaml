@@ -1,1 +1,27 @@
 task_name: QP
+prerequisite: 宝具三连刷QP，自出所长和哈贝喵，然后借一个哈贝喵，筛选使用QP优先，好友应该都会挂哈贝喵 + 贝拉·丽莎
+troop: [所长, 哈贝喵, 哈贝喵]
+type: flow
+turns:
+  1:
+    skills:
+      - skill: 2号位哈贝喵/2
+    cards:
+      - np: 为你纺织的时光之轮
+      - [buster, arts, quick]
+      - [buster, arts, quick]
+  2:
+    skills:
+      - skill: 3号位哈贝喵/2
+    cards:
+      - np: 为你纺织的时光之轮
+      - [buster, arts, quick]
+      - [buster, arts, quick]
+  3:
+    skills:
+      - skill: 所长/2
+      - skill: 所长/1
+    cards:
+      - np: 既已过去的人理之终
+      - buster
+      - buster

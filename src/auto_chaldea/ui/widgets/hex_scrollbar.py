@@ -5,8 +5,15 @@
 # 同时替换横竖两条滚动条。
 
 from PySide6.QtCore import QPointF, Qt
-from PySide6.QtGui import QColor, QLinearGradient, QPainter, QPainterPath, QPen, QPolygonF
-from PySide6.QtWidgets import QAbstractScrollArea, QHBoxLayout, QScrollBar, QWidget
+from PySide6.QtGui import (
+    QColor,
+    QLinearGradient,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QPolygonF,
+)
+from PySide6.QtWidgets import QHBoxLayout, QScrollBar, QWidget
 
 _GOLD = "#dac254"
 _TOP = "#ffffff"
@@ -62,7 +69,9 @@ class HexScrollBar(QScrollBar):
         cross = self.width() if vertical else self.height()
 
         span = self.maximum() - self.minimum()
-        length = max(_MIN_LENGTH, round(track * self.pageStep() / (span + self.pageStep())))
+        length = max(
+            _MIN_LENGTH, round(track * self.pageStep() / (span + self.pageStep()))
+        )
         travel = track - length
         offset = round(travel * self.value() / span) if span > 0 else 0
 

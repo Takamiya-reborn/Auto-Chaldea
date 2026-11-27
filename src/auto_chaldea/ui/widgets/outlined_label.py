@@ -5,19 +5,25 @@
 # 不会写进 palette），而是显式传入，默认金色 #eedb5a。
 
 import re
+from html import escape as html_escape
 
-from PySide6.QtCore import QPointF, Qt
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPen, QTextDocument
+from PySide6.QtCore import QPointF, QSize, Qt
+from PySide6.QtGui import (
+    QColor,
+    QFont,
+    QFontMetrics,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QTextDocument,
+)
 from PySide6.QtWidgets import QLabel
 
 from auto_chaldea.ui.common.theme import FGO
 
 # 8 方向描边偏移系数（跳过中心）
 _OUTLINE_OFFSETS = [
-    (dx, dy)
-    for dx in (-1, 0, 1)
-    for dy in (-1, 0, 1)
-    if (dx, dy) != (0, 0)
+    (dx, dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1) if (dx, dy) != (0, 0)
 ]
 
 
@@ -44,7 +50,11 @@ class OutlinedLabel(QLabel):
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setRenderHint(QPainter.TextAntialiasing)
 
-        if Qt.mightBeRichText(text):
+        if self.wordWrap() and not Qt.mightBeRichText(text):
+            # 纯文本 + 自动换行：走 QTextDocument 才有换行能力，
+            # 手动转义后与富文本同路径，但不做描边层的颜色改写
+            self._paint_wrapped_text(painter, text)
+        elif Qt.mightBeRichText(text):
             self._paint_rich_text(painter, text)
         else:
             self._paint_plain_text(painter, text)
@@ -80,9 +90,7 @@ class OutlinedLabel(QLabel):
         radius = max(1, round(self._outline_width / 2.0))
         pen = self._outline_pen()
         for dx, dy in _OUTLINE_OFFSETS:
-            painter.strokePath(
-                path.translated(x + dx * radius, y + dy * radius), pen
-            )
+            painter.strokePath(path.translated(x + dx * radius, y + dy * radius), pen)
 
         # 正文层：原生 drawText，走字体 hinting，与普通 QLabel 一样清晰
         pen = painter.pen()
@@ -99,6 +107,41 @@ class OutlinedLabel(QLabel):
             Qt.RoundJoin,
         )
 
+    # ---- 纯文本自动换行：转义成 HTML 后走 QTextDocument，结构与富文本路径一致 ----
+
+    def _wrapped_document(self, text, outline=False):
+        html = html_escape(text).replace("\n", "<br>")
+        return self._build_document(html, outline=outline)
+
+    def heightForWidth(self, width):
+        text = self.text()
+        if not self.wordWrap() or not text:
+            return super().heightForWidth(width)
+        # QLabel 对「自动换行 + 手工换行」混排的 heightForWidth 算少行数，
+        # 这里改用与绘制路径相同的 QTextDocument 计量，保证布局给足高度
+        if Qt.mightBeRichText(text):
+            doc = self._build_document(text)
+        else:
+            doc = self._wrapped_document(text)
+        margins = self.margin() * 2
+        doc.setTextWidth(max(1, width - margins))
+        return int(doc.size().height()) + margins
+
+    def _paint_wrapped_text(self, painter, text):
+        origin = self._content_origin_plain()
+        doc = self._wrapped_document(text, outline=True)
+        radius = max(1, round(self._outline_width / 2.0))
+        for dx, dy in _OUTLINE_OFFSETS:
+            painter.save()
+            painter.translate(origin.x() + dx * radius, origin.y() + dy * radius)
+            doc.drawContents(painter)
+            painter.restore()
+
+        origin = self._content_origin_plain()
+        painter.translate(round(origin.x()), round(origin.y()))
+        doc = self._wrapped_document(text)
+        doc.drawContents(painter)
+
     # ---- 富文本（状态栏的彩色圆点等）：QTextDocument 多层偏移叠加 ----
 
     def _paint_rich_text(self, painter, text):
@@ -113,9 +156,7 @@ class OutlinedLabel(QLabel):
         radius = max(1, round(self._outline_width / 2.0))
         for dx, dy in _OUTLINE_OFFSETS:
             painter.save()
-            painter.translate(
-                origin.x() + dx * radius, origin.y() + dy * radius
-            )
+            painter.translate(origin.x() + dx * radius, origin.y() + dy * radius)
             doc.drawContents(painter)
             painter.restore()
 
@@ -149,8 +190,21 @@ class OutlinedLabel(QLabel):
     # 富文本按标签对齐方式与控件高度垂直居中
     def _content_origin(self, html):
         doc = self._build_document(html)
+        return self._align_origin(doc)
+
+    # 纯文本换行路径的原文档排版
+    def _content_origin_plain(self):
+        return self._align_origin(self._wrapped_document(self.text()))
+
+    def _align_origin(self, doc):
         x = 0.0
         if self.alignment() & Qt.AlignRight:
             x = self.width() - doc.size().width()
-        y = max(0.0, (self.height() - doc.size().height()) / 2)
+        h = self.height()
+        if self.alignment() & Qt.AlignBottom:
+            y = max(0.0, h - doc.size().height())
+        elif self.alignment() & Qt.AlignTop:
+            y = 0.0
+        else:
+            y = max(0.0, (h - doc.size().height()) / 2)
         return QPointF(x, y)

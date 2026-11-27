@@ -1,0 +1,28 @@
+task_name: 禁断书页-彩虹城
+prerequisite: 所长 + 哈贝喵 + 师匠，26万血的大眼需要配置稍高，宝具等级高/角色等级高/高AIK/宝具加成的礼装，不然可能打不死，想要使用妖兰就使用 血之泪石-彩虹城.yaml
+troop: [所长, 哈贝喵, 师匠]
+type: flow
+turns:
+  1:
+    skills:
+      - skill: 所长/2
+    cards:
+      - np: 既已过去的人理之终
+      - [buster, arts, quick]
+      - [buster, arts, quick]
+  2:
+    skills:
+      - skill: 哈贝喵/2
+    cards:
+      - np: 为你纺织的时光之轮
+      - [buster, arts, quick]
+      - [buster, arts, quick]
+  3:
+    skills:
+      - skill: 师匠/1
+      - skill: 师匠/2
+      - skill: 师匠/3
+    cards:
+      - np: 贯穿死翔之枪
+      - [buster, arts, quick]
+      - [buster, arts, quick]

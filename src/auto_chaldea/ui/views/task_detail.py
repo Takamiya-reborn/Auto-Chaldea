@@ -107,6 +107,7 @@ class TaskDetailView(QWidget):
         self._desc_label = OutlinedLabel(parent=page)
         self._desc_label.setObjectName("detailDesc")
         self._desc_label.setWordWrap(True)
+        self._desc_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         layout.addWidget(self._desc_label)
 
         self._table = TaskStepTable(page)

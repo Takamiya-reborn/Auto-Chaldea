@@ -15,7 +15,7 @@ SKILL_SLOTS = ("1", "2", "3")
 _DB = None
 
 
-# 名称/别称/引用的归一化：去空白、全角－转半角，匹配时忽略这两类书写差异
+# 名称/昵称/引用的归一化：去空白、全角－转半角，匹配时忽略这两类书写差异
 def normalize_name(value):
     return re.sub(r"\s+", "", str(value)).replace("－", "-")
 
@@ -63,7 +63,7 @@ class Servant:
                 f"{path}: 职介 {class_name!r} 与目录名 {path.parent.name!r} 不一致"
             )
         self.class_name = class_name
-        aliases = data.get("别称") or []
+        aliases = data.get("昵称") or []
         if isinstance(aliases, str):
             aliases = [aliases]
         self.aliases = [str(alias).strip() for alias in aliases if str(alias).strip()]
@@ -120,7 +120,7 @@ class Servant:
 
 
 class ServantDB:
-    # 名称 + 别称 → 档案；键冲突即失败（引用歧义在加载期暴露）
+    # 名称 + 昵称 → 档案；键冲突即失败（引用歧义在加载期暴露）
     def __init__(self, servants):
         self._by_key = {}
         for servant in servants:
@@ -132,7 +132,7 @@ class ServantDB:
                 if existing is not None and existing is not servant:
                     raise ValueError(
                         f"角色键 {key!r} 同时出现在 {existing.path.name} 与 "
-                        f"{servant.path.name}，请改用不同别称"
+                        f"{servant.path.name}，请改用不同昵称"
                     )
                 self._by_key[normalized] = servant
 
@@ -214,7 +214,7 @@ def resolve_skill(ref):
 
 
 def resolve_troop(entries):
-    # troop 字段 → 归一化名/别称 → 位次列表（1 起）。
+    # troop 字段 → 归一化名/昵称 → 位次列表（1 起）。
     # 位次 = 队伍顺序（1-3 人），决定技能栏分区（1/2/3号位）；同名多副本
     # （自出 + 助战）合法，此时一个名字对应多个位次，
     # 引用其技能时须写 "N号位名字/技能号" 前缀消歧

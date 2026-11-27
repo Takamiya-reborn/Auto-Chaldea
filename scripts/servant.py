@@ -1,6 +1,6 @@
 # 从 Mooncell 生成从者档案骨架：python scripts/servant.py <Mooncell页面名>
 # 参数即 https://fgo.wiki/w/<参数> 的页面名（支持重定向页，如 杀狐 → 光之高扬斯卡娅）。
-# 自动字段：名称/别称/职介/灵基名单/技能名注释
+# 自动字段：名称/昵称/职介/灵基名单/技能名注释
 # 人工字段：立绘/图标/模板 映射（骨架里全部 null，生成后按提示补截图归属）
 #
 #   python scripts/servant.py 光之高扬斯卡娅            # 生成档案
@@ -44,7 +44,7 @@ def api(params):
 
 
 def fetch_wikitext(page):
-    # 参数 = /w/<页面名>；redirects=1 使命名页（杀狐等别称页）落到正式从者页
+    # 参数 = /w/<页面名>；redirects=1 使命名页（杀狐等昵称页）落到正式从者页
     data = api({"action": "parse", "page": page, "prop": "wikitext", "redirects": "1"})
     parse = data.get("parse") or {}
     text = (parse.get("wikitext") or {}).get("*") or ""
@@ -160,7 +160,7 @@ def build_yaml(info):
         f"名称: {info['name']}",
     ]
     if info["aliases"]:
-        lines.append(f"别称: [{', '.join(info['aliases'])}]")
+        lines.append(f"昵称: [{', '.join(info['aliases'])}]")
     lines.append(f"职介: {info['class']}")
     lines.append("")
     lines.append(f"角色池目录: {info['name']}")
@@ -235,7 +235,7 @@ def main():
         print(f"已生成：{target.relative_to(REPO_ROOT)}")
 
     print()
-    print(f"名称={info['name']}  职介={info['class']}  别称={info['aliases'] or '无'}")
+    print(f"名称={info['name']}  职介={info['class']}  昵称={info['aliases'] or '无'}")
     print(f"灵基形态 {len(info['stages'])} 个 + 灵衣/变体 {len(info['extras'])} 个")
     print("待人工登记：立绘 / 技能图标 / 宝具模板（骨架中均为 null）")
     scan_local_templates()

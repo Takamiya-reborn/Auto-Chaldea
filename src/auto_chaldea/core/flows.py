@@ -67,7 +67,7 @@ def _build_standard_farm(task):
         raise ValueError(
             f"'turns' keys must be consecutive turns starting at 1: {turns}"
         )
-    # troop：三个位次的从者名（名字或别称），决定技能栏分区。技能池图标
+    # troop：三个位次的从者名（名字或昵称），决定技能栏分区。技能池图标
     # 全队通用，skill 条目必须按位次分区，否则共享图标会跨从者误命中
     troop = servants.resolve_troop(task.get("troop"))
 
@@ -194,7 +194,7 @@ def _battle_node(position):
 
 
 # 回合脚本条目 → 节点子步骤列表（复用 task_executor 的步骤语法）。
-# troop：归一化名/别称 → 位次列表，skill 条目按位次生成技能栏分区
+# troop：归一化名/昵称 → 位次列表，skill 条目按位次生成技能栏分区
 def _battle_steps(battle, troop):
     if not isinstance(battle, dict):
         raise ValueError(f"Battle entry must be a mapping, got {battle!r}")
@@ -279,7 +279,7 @@ def _battle_steps(battle, troop):
 # 技能条目 → 子步骤列表：本体点击 + 可选 target 子步骤（选目标 + 延后双击）。
 # 技能条目只支持 skill / master / const；target 不是独立条目，而是挂在条目上的子步骤字段。
 # 动画加速内化为双击 / 延后双击，不再生成显式的 Center 点击步骤。
-# troop：归一化名/别称 → 位次列表。skill 条目的识别区域自动限定为该从者
+# troop：归一化名/昵称 → 位次列表。skill 条目的识别区域自动限定为该从者
 # 位次的技能栏分区（技能池图标全队通用，不分区会跨从者误命中）；
 # 同名多副本（自出 + 助战）用 "N号位名字/技能号" 前缀消歧
 def _skill_steps(skill, troop):
